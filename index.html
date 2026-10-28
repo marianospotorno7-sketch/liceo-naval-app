@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Liceo Naval — Mi Rendimiento</title>
+<meta name="theme-color" content="#07090c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Liceo Naval">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=JetBrains+Mono:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --bg:#07090c; --panel:#12151a; --panel2:#161a20; --border:#232830; --border2:#2a3038;
+  --accent:#ff8a1e; --accent-dim:#ff8a1e26;
+  --gold:#c9a961; --gold-dim:#c9a96126; --gold-bright:#e8c987;
+  --text:#f2f3f5; --text-dim:#8b93a1; --text-mid:#c3c9d2;
+  --green:#3ecf7e; --red:#ef5350; --blue:#4aa3ff;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --display:'Playfair Display',Georgia,serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:
+    radial-gradient(1200px 500px at 15% -10%, #10203a33, transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, #2a1a0533, transparent 55%),
+    var(--bg);
+  color:var(--text);font-family:var(--sans);min-height:100vh;}
+.wrap{max-width:560px;margin:0 auto;padding:22px 16px calc(84px + env(safe-area-inset-bottom));min-height:100vh;}
+.hidden{display:none !important;}
+h1,h2,h3{margin:0;}
+button{font-family:var(--sans);}
+input,select{font-family:var(--sans);}
+
+/* ---------- Login ---------- */
+#loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;}
+#loginScreen img{width:96px;height:96px;border-radius:50%;box-shadow:0 0 0 3px var(--gold-dim),0 10px 30px rgba(0,0,0,.5);}
+#loginScreen h1{font-family:var(--display);font-size:26px;font-weight:800;
+  background:linear-gradient(120deg,#fff 0%,#f2f3f5 55%,var(--gold-bright) 130%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+#loginScreen .sub{color:var(--text-dim);font-size:13.5px;max-width:320px;}
+#gBtn{margin-top:6px;}
+#loginMsg{font-family:var(--mono);font-size:12px;color:var(--red);max-width:320px;}
+#ingresoLink{font-family:var(--mono);font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--border2);padding:10px 16px;border-radius:20px;}
+
+/* ---------- Header / Nav ---------- */
+header.topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+header.topbar img{width:40px;height:40px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px var(--gold-dim);}
+header.topbar .who{flex:1;}
+header.topbar .who .name{font-family:var(--display);font-size:17px;font-weight:700;}
+header.topbar .who .cat{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;}
+#logoutBtn{background:none;border:1px solid var(--border2);color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:7px 11px;border-radius:14px;cursor:pointer;}
+
+nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--panel);border-top:1px solid var(--border);
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:50;}
+nav.tabs button{flex:1;background:none;border:none;color:var(--text-dim);font-family:var(--mono);font-size:11px;
+  padding:8px 4px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;letter-spacing:.02em;}
+nav.tabs button .ic{font-size:18px;}
+nav.tabs button.active{color:var(--accent);background:var(--accent-dim);font-weight:700;}
+
+.screen{display:none;}
+.screen.active{display:block;}
+
+/* ---------- Mis Datos ---------- */
+.statrow{display:flex;gap:10px;margin-bottom:18px;}
+.statbox{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+.statbox .num{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--gold-bright);}
+.statbox .lbl{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+
+.exgroup-title{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.1em;margin:18px 0 8px;font-weight:700;}
+.excard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
+.excard .exname{font-family:var(--sans);font-weight:700;font-size:14px;}
+.excard .exrow{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;}
+.excard .exval{font-family:var(--mono);font-size:19px;font-weight:800;color:var(--text);}
+.excard .exval small{font-size:10px;color:var(--text-dim);font-weight:500;}
+.excard .exrecord{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);text-align:right;}
+.excard .exempty{color:var(--text-dim);font-size:12.5px;font-family:var(--mono);}
+
+/* ---------- Ranking ---------- */
+.chiprow{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;-webkit-overflow-scrolling:touch;}
+.chip{flex-shrink:0;font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--border2);
+  color:var(--text-mid);padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#1a0f00;font-weight:700;}
+.rankbox{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 15px;margin-bottom:14px;}
+.rankbox h3{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.rankrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #171b21;font-size:12.5px;}
+.rankrow:last-child{border-bottom:none;}
+.rankrow .pos{width:20px;color:var(--text-dim);font-family:var(--mono);font-size:11px;flex-shrink:0;}
+.rankrow .nm{flex:1;font-weight:600;}
+.rankrow.me .nm{color:var(--accent);font-weight:800;}
+.rankrow .vv{font-family:var(--mono);font-weight:800;color:var(--gold-bright);font-size:12px;}
+.rankrow .rr{font-family:var(--mono);color:var(--text-dim);font-size:10px;width:52px;text-align:right;}
+.mypos{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;margin-top:8px;}
+
+/* ---------- Carga ---------- */
+fieldset{border:1px solid var(--border);border-radius:12px;margin:0 0 14px;padding:12px 14px;}
+legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;padding:0 6px;}
+.fitem{margin-bottom:10px;}
+.fitem label{display:block;font-family:var(--mono);font-size:9.5px;color:var(--text-dim);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;}
+.fitem input, .fitem select{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);
+  border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;}
+.exrow2{display:flex;gap:8px;}
+.exrow2 .fitem{flex:1;}
+.lastmark{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:6px;}
+#rpeVal{color:var(--accent);font-weight:800;}
+#submitBtn{width:100%;background:var(--accent);border:none;color:#1a0f00;font-weight:800;font-family:var(--sans);
+  font-size:15px;padding:14px;border-radius:12px;cursor:pointer;margin-top:4px;}
+#cargaMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
+
+.demobanner{background:var(--accent-dim);border:1px solid var(--accent);color:var(--gold-bright);font-family:var(--mono);
+  font-size:10.5px;text-align:center;padding:7px;border-radius:9px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN ======================= -->
+<div id="loginScreen">
+  <img src="./icons/icon-192.png" alt="Escudo Liceo Naval">
+  <h1>Liceo Naval</h1>
+  <div class="sub">Entrá con tu cuenta de Google para ver tus datos de fuerza, tu ranking y cargar tus sesiones.</div>
+  <div id="gBtn"></div>
+  <div id="loginMsg"></div>
+  <a id="ingresoLink" class="hidden" href="#" target="_blank" rel="noopener">Completar form de ingreso</a>
+  <button id="demoBtn" style="background:none;border:1px solid var(--border2);color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:8px 14px;border-radius:16px;cursor:pointer;">Ver demo sin login</button>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div class="wrap hidden" id="appScreen">
+  <header class="topbar">
+    <img src="./icons/icon-192.png" alt="">
+    <div class="who">
+      <div class="name" id="hNombre">—</div>
+      <div class="cat" id="hCamada">—</div>
+    </div>
+    <button id="logoutBtn">Salir</button>
+  </header>
+
+  <div id="demoBanner" class="demobanner hidden">MODO DEMO — el backend todavía no está conectado. Esto es un ejemplo.</div>
+
+  <!-- -------- Mis Datos -------- -->
+  <section class="screen active" id="screenDatos">
+    <div class="statrow">
+      <div class="statbox"><div class="num" id="statTotal">—</div><div class="lbl">Cargas totales</div></div>
+      <div class="statbox"><div class="num" id="statMes">—</div><div class="lbl">Este mes</div></div>
+    </div>
+    <div class="exgroup-title">Potencia</div>
+    <div id="grupoPotencia"></div>
+    <div class="exgroup-title">Fuerza</div>
+    <div id="grupoFuerza"></div>
+    <div class="exgroup-title">Salto</div>
+    <div id="grupoSalto"></div>
+  </section>
+
+  <!-- -------- Ranking -------- -->
+  <section class="screen" id="screenRanking">
+    <div class="chiprow" id="rankChips"></div>
+    <div class="rankbox">
+      <h3>Top 10 — tu camada</h3>
+      <div id="rankCamada"></div>
+      <div class="mypos" id="miPosCamada"></div>
+    </div>
+    <div class="rankbox">
+      <h3>Top 10 — club</h3>
+      <div id="rankClub"></div>
+      <div class="mypos" id="miPosClub"></div>
+    </div>
+  </section>
+
+  <!-- -------- Carga -------- -->
+  <section class="screen" id="screenCarga">
+    <div class="fitem">
+      <label>Fecha</label>
+      <input type="date" id="cFecha">
+    </div>
+
+    <fieldset>
+      <legend>Potencia</legend>
+      <div id="campoArranque"></div>
+      <div id="campoCargada"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Fuerza</legend>
+      <div id="campoSentadilla"></div>
+      <div id="campoPesoMuerto"></div>
+      <div id="campoDespegue"></div>
+      <div id="campoPressBanca"></div>
+      <div id="campoPressHombro"></div>
+      <div id="campoDominadas"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Salto y cierre</legend>
+      <div class="fitem">
+        <div class="lastmark" id="lastSalto"></div>
+        <label>Salto horizontal (m)</label>
+        <input type="text" inputmode="decimal" id="cSalto" placeholder="ej. 2.40">
+      </div>
+      <div class="fitem">
+        <label>Peso corporal (kg) — una vez por semana</label>
+        <input type="text" inputmode="decimal" id="cPeso" placeholder="ej. 82.5">
+      </div>
+      <div class="fitem">
+        <label>RPE sesión: <span id="rpeVal">5</span></label>
+        <input type="range" min="0" max="10" value="5" id="cRpe">
+        <div class="lastmark" id="rpeEscala" style="margin-top:6px;margin-bottom:0;">0 Reposo · 3 Moderada · 5 Dura · 7 Muy dura · 10 Máximo</div>
+      </div>
+      <div class="fitem">
+        <label>Duración (min)</label>
+        <input type="text" inputmode="numeric" id="cMin" placeholder="60">
+      </div>
+    </fieldset>
+
+    <button id="submitBtn">Cargar sesión</button>
+    <div id="cargaMsg"></div>
+  </section>
+
+  <nav class="tabs">
+    <button class="tab active" data-screen="Datos"><span class="ic">📊</span>Mis Datos</button>
+    <button class="tab" data-screen="Ranking"><span class="ic">🏆</span>Ranking</button>
+    <button class="tab" data-screen="Carga"><span class="ic">➕</span>Cargar</button>
+  </nav>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
