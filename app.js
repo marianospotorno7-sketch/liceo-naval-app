@@ -5,8 +5,8 @@
 // ============================================================================
 var CONFIG = {
   CLIENT_ID: '191749685889-0v8tsod2jdpm8le4icnp2lqc3545p9do.apps.googleusercontent.com',
-  BACKEND_URL: 'PENDIENTE',                              // URL /exec del Apps Script Web App desplegado
-  FORM_INGRESO_URL: 'PENDIENTE'                           // URL del form de ingreso (Logger de crearFormularioIngreso)
+  BACKEND_URL: 'https://script.google.com/macros/s/AKfycbw_QdHUyuXu6lmVXFWZdeYwW9sgz36yIEmRUHeSm4-eROFeWKFOzzwJ-lnfDSdr2661tQ/exec',
+  FORM_INGRESO_URL: 'https://docs.google.com/forms/d/e/1FAIpQLScy8TN1eog6jo0YIvow0ENvc03Nv-NldtVA-zJKgkRigTTfTg/viewform'
 };
 
 var EJERCICIOS_POTENCIA = ['ARRANQUE', 'CARGADA'];
