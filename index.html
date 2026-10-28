@@ -115,6 +115,21 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
 
 .demobanner{background:var(--accent-dim);border:1px solid var(--accent);color:var(--gold-bright);font-family:var(--mono);
   font-size:10.5px;text-align:center;padding:7px;border-radius:9px;margin-bottom:14px;}
+
+/* ---------- Avisos ---------- */
+#composeBox select, #composeBox input{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);
+  border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;}
+#avEnviarBtn{width:100%;background:var(--accent);border:none;color:#1a0f00;font-weight:800;font-family:var(--sans);
+  font-size:14px;padding:12px;border-radius:12px;cursor:pointer;margin-top:4px;}
+.tab{position:relative;}
+#avBadge{position:absolute;top:2px;right:16px;background:var(--red);color:#fff;font-size:9px;font-weight:800;
+  min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
+.cumplecard{background:var(--gold-dim);border:1px solid var(--gold);border-radius:12px;padding:12px 15px;margin-bottom:9px;
+  font-size:13px;}
+.cumplecard b{color:var(--gold-bright);}
+.avisocard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
+.avisocard .meta{font-family:var(--mono);font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
+.avisocard .texto{font-size:13.5px;}
 </style>
 </head>
 <body>
@@ -224,10 +239,47 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
     <div id="cargaMsg"></div>
   </section>
 
+  <!-- -------- Avisos -------- -->
+  <section class="screen" id="screenAvisos">
+    <div id="composeBox" class="hidden">
+      <div class="exgroup-title">Escribir un aviso</div>
+      <div class="fitem">
+        <label>Para</label>
+        <select id="avDestinoTipo">
+          <option value="TODOS">Todos</option>
+          <option value="CAMADA">Una camada</option>
+          <option value="JUGADOR">Un jugador</option>
+        </select>
+      </div>
+      <div class="fitem hidden" id="avCamadaWrap">
+        <label>Camada</label>
+        <select id="avCamada">
+          <option value="M15">M15</option><option value="M16">M16</option><option value="M17">M17</option>
+          <option value="M19">M19</option><option value="PLANTEL">PLANTEL</option><option value="G2 PS">G2 PS</option>
+        </select>
+      </div>
+      <div class="fitem hidden" id="avJugadorWrap">
+        <label>Nombre del jugador (como está en la planilla)</label>
+        <input type="text" id="avJugador" placeholder="Ej. Pérez Juan">
+      </div>
+      <div class="fitem">
+        <label>Mensaje</label>
+        <input type="text" id="avTexto" placeholder="Escribí el aviso...">
+      </div>
+      <button id="avEnviarBtn">Enviar aviso</button>
+      <div id="avMsg" style="text-align:center;font-family:var(--mono);font-size:12px;margin:8px 0 18px;"></div>
+    </div>
+
+    <div id="cumpleBox"></div>
+    <div class="exgroup-title">Avisos</div>
+    <div id="avisosList"></div>
+  </section>
+
   <nav class="tabs">
     <button class="tab active" data-screen="Datos"><span class="ic">📊</span>Mis Datos</button>
     <button class="tab" data-screen="Ranking"><span class="ic">🏆</span>Ranking</button>
     <button class="tab" data-screen="Carga"><span class="ic">➕</span>Cargar</button>
+    <button class="tab" data-screen="Avisos"><span class="ic">🔔</span>Avisos<span id="avBadge" class="hidden"></span></button>
   </nav>
 </div>
 

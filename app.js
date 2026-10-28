@@ -17,7 +17,7 @@ var CAMPO_ID = {
   'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
 };
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE'};
+var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -55,6 +55,17 @@ function datosDemoRanking_() {
   });
   return {nombre: 'Jugador de ejemplo', camada: 'M17', ranking: out};
 }
+function datosDemoAvisos_() {
+  var hoy = new Date();
+  return {
+    esCoach: false, miCamada: 'M17', vistosHasta: null,
+    cumpleanos: [{nombre: 'Gómez Lucas', fecha: new Date(hoy.getTime() + 2 * 86400000).toISOString(), hoy: false}],
+    avisos: [
+      {id: '1', fecha: new Date(hoy.getTime() - 3600000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'TODOS', texto: 'Mañana entrenamos 1 hora más temprano.'},
+      {id: '2', fecha: new Date(hoy.getTime() - 86400000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'CAMADA', destinoValor: 'M17', texto: 'Buen laburo esta semana, M17.'}
+    ]
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Login con Google
@@ -81,10 +92,11 @@ function onGoogleLogin_(resp) {
 }
 
 function salir_() {
-  state.token = null;
+  state.token = null; state.esCoach = false;
   try { localStorage.removeItem('liceo_token'); } catch (e) {}
   document.getElementById('appScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(function (t) { t.style.display = ''; });
 }
 
 function entrarAlApp_() {
@@ -101,7 +113,10 @@ function backendGet_(action) {
   if (!configLista_()) return Promise.reject('sin-config');
   var url = CONFIG.BACKEND_URL + '?token=' + encodeURIComponent(state.token) + '&action=' + action;
   return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
-    if (j.error == 'SIN_VINCULAR') { mostrarSinVincular_(); return Promise.reject('sin-vincular'); }
+    if (j.error == 'SIN_VINCULAR') {
+      if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
+      mostrarSinVincular_(); return Promise.reject('sin-vincular');
+    }
     if (j.error) return Promise.reject(j.error);
     return j;
   });
@@ -114,16 +129,32 @@ function mostrarSinVincular_() {
   if (CONFIG.FORM_INGRESO_URL.indexOf('PENDIENTE') < 0) { a.href = CONFIG.FORM_INGRESO_URL; a.classList.remove('hidden'); }
 }
 
+// El coach (COACH_EMAILS en el backend) no tiene por qué tener fila de jugador: entra directo
+// a Avisos, sin Mis Datos/Ranking/Carga (son datos de jugador que no tiene).
+function entrarComoCoach_() {
+  state.esCoach = true;
+  document.getElementById('hNombre').textContent = 'Cuerpo técnico';
+  document.getElementById('hCamada').textContent = 'Liceo Naval';
+  document.querySelectorAll('.tab').forEach(function (t) { if (t.getAttribute('data-screen') != 'Avisos') t.style.display = 'none'; });
+  irAPantalla_('Avisos');
+  cargarAvisos_();
+}
+
 function marcarDemo_(si) { document.getElementById('demoBanner').classList.toggle('hidden', !si); state.demo = si; }
 
 function cargarMisDatos_() {
-  backendGet_('misdatos').then(function (d) { marcarDemo_(false); renderMisDatos_(d); })
-    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); });
+  backendGet_('misdatos').then(function (d) { marcarDemo_(false); state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
+    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach') return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
 }
 
 function cargarRanking_() {
   backendGet_('ranking').then(function (d) { marcarDemo_(false); state.ranking = d; renderRanking_(); })
-    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach') return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+}
+
+function cargarAvisos_() {
+  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; renderAvisos_(); actualizarBadge_(); })
+    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); renderAvisos_(); actualizarBadge_(); });
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +242,82 @@ function renderRanking_() {
 }
 
 // ---------------------------------------------------------------------------
+// Render: Avisos
+// ---------------------------------------------------------------------------
+function fmtFechaHora_(iso) {
+  var d = new Date(iso); if (isNaN(d)) return '';
+  return d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit'}) + ' ' + d.toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
+}
+
+function destinoTexto_(a) {
+  if (a.destinoTipo == 'TODOS') return 'A todos';
+  if (a.destinoTipo == 'CAMADA') return 'A ' + a.destinoValor;
+  if (a.destinoTipo == 'JUGADOR') return 'A ' + a.destinoValor;
+  return '';
+}
+
+function renderAvisos_() {
+  var d = state.avisos; if (!d) return;
+  document.getElementById('composeBox').classList.toggle('hidden', !d.esCoach);
+
+  var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
+  (d.cumpleanos || []).forEach(function (c) {
+    var div = document.createElement('div'); div.className = 'cumplecard';
+    div.innerHTML = '🎂 <b>' + c.nombre + '</b> — ' + (c.hoy ? '¡cumple hoy!' : 'cumple el ' + fmtFecha_(c.fecha));
+    cb.appendChild(div);
+  });
+
+  var list = document.getElementById('avisosList'); list.innerHTML = '';
+  if (!d.avisos || !d.avisos.length) { list.innerHTML = '<div class="exempty">Todavía no hay avisos.</div>'; }
+  (d.avisos || []).forEach(function (a) {
+    var div = document.createElement('div'); div.className = 'avisocard';
+    var meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = fmtFechaHora_(a.fecha) + (state.esCoach ? ' · ' + destinoTexto_(a) : '');
+    var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = a.texto;
+    div.appendChild(meta); div.appendChild(texto);
+    list.appendChild(div);
+  });
+}
+
+function actualizarBadge_() {
+  var badge = document.getElementById('avBadge');
+  var d = state.avisos;
+  if (!d || !d.avisos) { badge.classList.add('hidden'); return; }
+  var vistos = d.vistosHasta ? new Date(d.vistosHasta).getTime() : 0;
+  var noLeidos = d.avisos.filter(function (a) { return new Date(a.fecha).getTime() > vistos; }).length;
+  if (noLeidos > 0 && !state.esCoach) { badge.textContent = noLeidos > 9 ? '9+' : noLeidos; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+function marcarAvisosVistos_() {
+  if (!configLista_() || state.esCoach) return;
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'marcarAvisosVistos'})}).catch(function () {});
+}
+
+function enviarAviso_() {
+  var msg = document.getElementById('avMsg');
+  var texto = document.getElementById('avTexto').value.trim();
+  var destinoTipo = document.getElementById('avDestinoTipo').value;
+  var destinoValor = destinoTipo == 'CAMADA' ? document.getElementById('avCamada').value
+    : destinoTipo == 'JUGADOR' ? document.getElementById('avJugador').value.trim() : '';
+  if (!texto) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí un mensaje.'; return; }
+  if (destinoTipo == 'JUGADOR' && !destinoValor) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí el nombre del jugador.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad.'; return; }
+  msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'enviarAviso', destinoTipo: destinoTipo, destinoValor: destinoValor, texto: texto})})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
+      msg.style.color = 'var(--green)'; msg.textContent = '¡Aviso enviado!';
+      document.getElementById('avTexto').value = '';
+      cargarAvisos_();
+    })
+    .catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+}
+
+// ---------------------------------------------------------------------------
 // Carga
 // ---------------------------------------------------------------------------
 function campoRM_(nombre) {
@@ -281,6 +388,7 @@ function irAPantalla_(nombre) {
   document.getElementById('screen' + nombre).classList.add('active');
   if (nombre == 'Ranking' && !state.ranking) cargarRanking_();
   if (nombre == 'Carga') pintarCamposCarga_();
+  if (nombre == 'Avisos') { cargarAvisos_(); marcarAvisosVistos_(); document.getElementById('avBadge').classList.add('hidden'); }
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +400,11 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('demoBtn').onclick = function () { state.token = 'demo'; entrarAlApp_(); };
   document.getElementById('submitBtn').onclick = enviarCarga_;
   document.getElementById('cRpe').oninput = function (e) { document.getElementById('rpeVal').textContent = e.target.value; };
+  document.getElementById('avEnviarBtn').onclick = enviarAviso_;
+  document.getElementById('avDestinoTipo').onchange = function (e) {
+    document.getElementById('avCamadaWrap').classList.toggle('hidden', e.target.value != 'CAMADA');
+    document.getElementById('avJugadorWrap').classList.toggle('hidden', e.target.value != 'JUGADOR');
+  };
 
   var token = null;
   try { token = localStorage.getItem('liceo_token'); } catch (e) {}
