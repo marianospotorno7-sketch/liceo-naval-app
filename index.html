@@ -130,6 +130,12 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
 .avisocard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;}
 .avisocard .meta{font-family:var(--mono);font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
 .avisocard .texto{font-size:13.5px;}
+#avJugadorWrap{position:relative;}
+#avJugadorSugerencias{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--panel2);
+  border:1px solid var(--border2);border-top:none;border-radius:0 0 9px 9px;max-height:190px;overflow-y:auto;}
+#avJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
+#avJugadorSugerencias .sug:last-child{border-bottom:none;}
+#avJugadorSugerencias .sug:hover{background:var(--accent-dim);}
 </style>
 </head>
 <body>
@@ -260,7 +266,8 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
       </div>
       <div class="fitem hidden" id="avJugadorWrap">
         <label>Nombre del jugador (como está en la planilla)</label>
-        <input type="text" id="avJugador" placeholder="Ej. Pérez Juan">
+        <input type="text" id="avJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
+        <div id="avJugadorSugerencias" class="hidden"></div>
       </div>
       <div class="fitem">
         <label>Mensaje</label>

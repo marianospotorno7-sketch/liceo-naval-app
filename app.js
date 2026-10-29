@@ -21,7 +21,7 @@ var CAMPO_ID = {
 var ETIQUETAS = {'PRESS BANCA': 'PRESS PECHO'};
 function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false};
+var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false, jugadoresLista: []};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -157,8 +157,8 @@ function cargarRanking_() {
 }
 
 function cargarAvisos_() {
-  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; renderAvisos_(); actualizarBadge_(); })
-    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); renderAvisos_(); actualizarBadge_(); });
+  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; state.jugadoresLista = d.jugadores || []; renderAvisos_(); actualizarBadge_(); })
+    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; renderAvisos_(); actualizarBadge_(); });
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +299,33 @@ function marcarAvisosVistos_() {
     body: JSON.stringify({token: state.token, action: 'marcarAvisosVistos'})}).catch(function () {});
 }
 
+function normalizarBusqueda_(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Sugerencias del buscador de jugador al escribir un aviso a "Un jugador": filtra
+// state.jugadoresLista (la manda el backend solo al coach) por coincidencia en cualquier
+// parte del nombre, sin importar mayúsculas/tildes.
+function renderSugerenciasJugador_(q) {
+  var cont = document.getElementById('avJugadorSugerencias');
+  var query = normalizarBusqueda_(q).trim();
+  if (!query) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
+  var coincidencias = (state.jugadoresLista || [])
+    .filter(function (n) { return normalizarBusqueda_(n).indexOf(query) >= 0; })
+    .slice(0, 8);
+  cont.innerHTML = '';
+  if (!coincidencias.length) { cont.classList.add('hidden'); return; }
+  coincidencias.forEach(function (n) {
+    var div = document.createElement('div'); div.className = 'sug'; div.textContent = n;
+    div.onclick = function () {
+      document.getElementById('avJugador').value = n;
+      cont.classList.add('hidden'); cont.innerHTML = '';
+    };
+    cont.appendChild(div);
+  });
+  cont.classList.remove('hidden');
+}
+
 function enviarAviso_() {
   var msg = document.getElementById('avMsg');
   var texto = document.getElementById('avTexto').value.trim();
@@ -409,7 +436,12 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('avDestinoTipo').onchange = function (e) {
     document.getElementById('avCamadaWrap').classList.toggle('hidden', e.target.value != 'CAMADA');
     document.getElementById('avJugadorWrap').classList.toggle('hidden', e.target.value != 'JUGADOR');
+    document.getElementById('avJugadorSugerencias').classList.add('hidden');
   };
+  document.getElementById('avJugador').oninput = function (e) { renderSugerenciasJugador_(e.target.value); };
+  document.getElementById('avJugador').addEventListener('blur', function () {
+    setTimeout(function () { document.getElementById('avJugadorSugerencias').classList.add('hidden'); }, 150);
+  });
 
   var token = null;
   try { token = localStorage.getItem('liceo_token'); } catch (e) {}
