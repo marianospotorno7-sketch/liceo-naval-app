@@ -9,7 +9,12 @@ var CONFIG = {
   FORM_INGRESO_URL: 'https://docs.google.com/forms/d/e/1FAIpQLScy8TN1eog6jo0YIvow0ENvc03Nv-NldtVA-zJKgkRigTTfTg/viewform'
 };
 
+// Lista "de ranking": tiene que ser EXACTAMENTE la misma que RANKING_POTENCIA en el backend —
+// de acá salen los chips de la pantalla Ranking.
 var EJERCICIOS_POTENCIA = ['ARRANQUE', 'CARGADA'];
+// Lista solo para la pantalla de Carga: lo mismo + Tirón de Arranque y Tirón de Cargada (pedido
+// de Mariano, 29/10) — quedan guardados en la base pero no se muestran en Mis Datos ni Ranking.
+var EJERCICIOS_POTENCIA_CARGA = ['ARRANQUE', 'TIRÓN DE ARRANQUE', 'CARGADA', 'TIRÓN DE CARGADA'];
 // Lista "de ranking": tiene que ser EXACTAMENTE la misma que RANKING_FUERZA en el backend —
 // de acá salen los chips de la pantalla Ranking.
 var EJERCICIOS_FUERZA = ['SENTADILLA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA', 'PRESS HOMBRO', 'DOMINADAS'];
@@ -18,7 +23,8 @@ var EJERCICIOS_FUERZA = ['SENTADILLA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA',
 // — el dato queda guardado en la base, simplemente no se ve en la app salvo al cargarlo).
 var EJERCICIOS_FUERZA_CARGA = ['SENTADILLA', 'SENTADILLA MEDIA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA', 'PRESS HOMBRO', 'DOMINADAS'];
 var CAMPO_ID = {
-  'ARRANQUE': 'campoArranque', 'CARGADA': 'campoCargada', 'SENTADILLA': 'campoSentadilla',
+  'ARRANQUE': 'campoArranque', 'TIRÓN DE ARRANQUE': 'campoTironArranque', 'CARGADA': 'campoCargada',
+  'TIRÓN DE CARGADA': 'campoTironCargada', 'SENTADILLA': 'campoSentadilla',
   'SENTADILLA MEDIA': 'campoSentadillaMedia', 'PESO MUERTO': 'campoPesoMuerto', 'DESPEGUE': 'campoDespegue',
   'PRESS BANCA': 'campoPressBanca', 'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
 };
@@ -369,7 +375,7 @@ function campoRM_(nombre) {
   var etq = etiquetaCarga_(nombre);
   div.innerHTML =
     '<div class="fitem"><label>' + etq + ' · Kg</label><input type="text" inputmode="decimal" data-ej="' + nombre + '" data-campo="kg"></div>' +
-    '<div class="fitem"><label>' + etq + ' · Reps (1 a 10)</label><input type="text" inputmode="numeric" data-ej="' + nombre + '" data-campo="reps"></div>';
+    '<div class="fitem"><label>' + etq + ' · Reps (1 a 15)</label><input type="text" inputmode="numeric" data-ej="' + nombre + '" data-campo="reps"></div>';
   var wrap = document.createElement('div');
   if (last) { var l = document.createElement('div'); l.className = 'lastmark'; l.textContent = 'Última: ' + last.actual + ' kg'; wrap.appendChild(l); }
   wrap.appendChild(div);
@@ -377,7 +383,7 @@ function campoRM_(nombre) {
 }
 
 function pintarCamposCarga_() {
-  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA_CARGA).forEach(function (e) {
+  EJERCICIOS_POTENCIA_CARGA.concat(EJERCICIOS_FUERZA_CARGA).forEach(function (e) {
     var cont = document.getElementById(CAMPO_ID[e]); if (!cont) return;
     cont.innerHTML = ''; cont.appendChild(campoRM_(e));
   });
@@ -409,8 +415,8 @@ function enviarCarga_() {
     duracionMin: document.getElementById('cMin').value, ejercicios: ejercicios
   };
   if (!ejercicios.length && !body.pesoCorporal) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá al menos un ejercicio.'; return; }
-  var repsInvalidas = ejercicios.filter(function (e) { return e.reps && (Number(e.reps) < 1 || Number(e.reps) > 10); });
-  if (repsInvalidas.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Reps fuera de rango en ' + repsInvalidas.map(function (e) { return e.nombre; }).join(', ') + ' (tiene que ser de 1 a 10).'; return; }
+  var repsInvalidas = ejercicios.filter(function (e) { return e.reps && (Number(e.reps) < 1 || Number(e.reps) > 15); });
+  if (repsInvalidas.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Reps fuera de rango en ' + repsInvalidas.map(function (e) { return e.nombre; }).join(', ') + ' (tiene que ser de 1 a 15).'; return; }
   if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
   msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)})
