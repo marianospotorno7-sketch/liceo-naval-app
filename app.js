@@ -16,6 +16,10 @@ var CAMPO_ID = {
   'PESO MUERTO': 'campoPesoMuerto', 'DESPEGUE': 'campoDespegue', 'PRESS BANCA': 'campoPressBanca',
   'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
 };
+// Nombres tal cual están en la base (no se tocan, serían decenas de miles de filas históricas)
+// vs. cómo se muestran en la app. Pedido de Mariano: "Press Banca" se ve como "Press Pecho".
+var ETIQUETAS = {'PRESS BANCA': 'PRESS PECHO'};
+function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 
 var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false};
 
@@ -167,7 +171,7 @@ function fmtFecha_(iso) {
 
 function tarjetaEj_(nombre, d, unidad) {
   var div = document.createElement('div'); div.className = 'excard';
-  var nameDiv = document.createElement('div'); nameDiv.className = 'exname'; nameDiv.textContent = nombre;
+  var nameDiv = document.createElement('div'); nameDiv.className = 'exname'; nameDiv.textContent = etiqueta_(nombre);
   div.appendChild(nameDiv);
   if (!d) {
     var vacio = document.createElement('div'); vacio.className = 'exempty'; vacio.textContent = 'Sin cargas todavía';
@@ -208,7 +212,7 @@ function renderRankChips_() {
   var cont = document.getElementById('rankChips'); cont.innerHTML = '';
   EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).forEach(function (e) {
     var b = document.createElement('button'); b.className = 'chip' + (e == state.rankingEj ? ' active' : '');
-    b.textContent = e; b.onclick = function () { state.rankingEj = e; renderRanking_(); };
+    b.textContent = etiqueta_(e); b.onclick = function () { state.rankingEj = e; renderRanking_(); };
     cont.appendChild(b);
   });
 }
@@ -323,9 +327,10 @@ function enviarAviso_() {
 function campoRM_(nombre) {
   var div = document.createElement('div'); div.className = 'exrow2';
   var last = state.misDatos && state.misDatos.ejercicios[nombre];
+  var etq = etiqueta_(nombre);
   div.innerHTML =
-    '<div class="fitem"><label>' + nombre + ' · Kg</label><input type="text" inputmode="decimal" data-ej="' + nombre + '" data-campo="kg"></div>' +
-    '<div class="fitem"><label>' + nombre + ' · Reps (1 a 10)</label><input type="text" inputmode="numeric" data-ej="' + nombre + '" data-campo="reps"></div>';
+    '<div class="fitem"><label>' + etq + ' · Kg</label><input type="text" inputmode="decimal" data-ej="' + nombre + '" data-campo="kg"></div>' +
+    '<div class="fitem"><label>' + etq + ' · Reps (1 a 10)</label><input type="text" inputmode="numeric" data-ej="' + nombre + '" data-campo="reps"></div>';
   var wrap = document.createElement('div');
   if (last) { var l = document.createElement('div'); l.className = 'lastmark'; l.textContent = 'Última: ' + last.actual + ' kg'; wrap.appendChild(l); }
   wrap.appendChild(div);
