@@ -21,6 +21,12 @@ var CAMPO_ID = {
 var ETIQUETAS = {'PRESS BANCA': 'PRESS PECHO'};
 function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 
+// Solo en la pantalla de Carga: lo que se anota como "Sentadilla" en la base es siempre
+// sentadilla PROFUNDA — se aclara acá para que el jugador no cargue otra variante sin darse
+// cuenta. Mis Datos y Ranking siguen mostrando "Sentadilla" como siempre.
+var ETIQUETAS_CARGA = {'SENTADILLA': 'SENTADILLA PROFUNDA'};
+function etiquetaCarga_(nombre) { return ETIQUETAS_CARGA[nombre] || etiqueta_(nombre); }
+
 var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false, jugadoresLista: []};
 
 function configLista_() {
@@ -354,7 +360,7 @@ function enviarAviso_() {
 function campoRM_(nombre) {
   var div = document.createElement('div'); div.className = 'exrow2';
   var last = state.misDatos && state.misDatos.ejercicios[nombre];
-  var etq = etiqueta_(nombre);
+  var etq = etiquetaCarga_(nombre);
   div.innerHTML =
     '<div class="fitem"><label>' + etq + ' · Kg</label><input type="text" inputmode="decimal" data-ej="' + nombre + '" data-campo="kg"></div>' +
     '<div class="fitem"><label>' + etq + ' · Reps (1 a 10)</label><input type="text" inputmode="numeric" data-ej="' + nombre + '" data-campo="reps"></div>';
