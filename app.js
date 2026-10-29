@@ -10,11 +10,16 @@ var CONFIG = {
 };
 
 var EJERCICIOS_POTENCIA = ['ARRANQUE', 'CARGADA'];
+// Lista "de ranking": tiene que ser EXACTAMENTE la misma que RANKING_FUERZA en el backend —
+// de acá salen los chips de la pantalla Ranking.
 var EJERCICIOS_FUERZA = ['SENTADILLA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA', 'PRESS HOMBRO', 'DOMINADAS'];
+// Lista para Carga y Mis Datos: lo mismo + ejercicios que se cargan y se trackean pero no
+// entran al Ranking (pedido de Mariano, 29/10: Sentadilla Media).
+var EJERCICIOS_FUERZA_TODOS = ['SENTADILLA', 'SENTADILLA MEDIA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA', 'PRESS HOMBRO', 'DOMINADAS'];
 var CAMPO_ID = {
   'ARRANQUE': 'campoArranque', 'CARGADA': 'campoCargada', 'SENTADILLA': 'campoSentadilla',
-  'PESO MUERTO': 'campoPesoMuerto', 'DESPEGUE': 'campoDespegue', 'PRESS BANCA': 'campoPressBanca',
-  'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
+  'SENTADILLA MEDIA': 'campoSentadillaMedia', 'PESO MUERTO': 'campoPesoMuerto', 'DESPEGUE': 'campoDespegue',
+  'PRESS BANCA': 'campoPressBanca', 'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
 };
 // Nombres tal cual están en la base (no se tocan, serían decenas de miles de filas históricas)
 // vs. cómo se muestran en la app. Pedido de Mariano: "Press Banca" se ve como "Press Pecho".
@@ -205,7 +210,7 @@ function renderMisDatos_(d) {
   EJERCICIOS_POTENCIA.forEach(function (e) { gp.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
 
   var gf = document.getElementById('grupoFuerza'); gf.innerHTML = '';
-  EJERCICIOS_FUERZA.forEach(function (e) { gf.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
+  EJERCICIOS_FUERZA_TODOS.forEach(function (e) { gf.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
 
   var gs = document.getElementById('grupoSalto'); gs.innerHTML = '';
   gs.appendChild(tarjetaEj_('SALTO HORIZONTAL', d.ejercicios['SALTO HORIZONTAL'], 'm'));
@@ -371,7 +376,7 @@ function campoRM_(nombre) {
 }
 
 function pintarCamposCarga_() {
-  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).forEach(function (e) {
+  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA_TODOS).forEach(function (e) {
     var cont = document.getElementById(CAMPO_ID[e]); if (!cont) return;
     cont.innerHTML = ''; cont.appendChild(campoRM_(e));
   });
