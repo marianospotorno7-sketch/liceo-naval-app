@@ -29,8 +29,9 @@ var CAMPO_ID = {
   'PRESS BANCA': 'campoPressBanca', 'PRESS HOMBRO': 'campoPressHombro', 'DOMINADAS': 'campoDominadas'
 };
 // Nombres tal cual están en la base (no se tocan, serían decenas de miles de filas históricas)
-// vs. cómo se muestran en la app. Pedido de Mariano: "Press Banca" se ve como "Press Pecho".
-var ETIQUETAS = {'PRESS BANCA': 'PRESS PECHO'};
+// vs. cómo se muestran en la app. Pedido de Mariano (30/10): Press Banca y Press Pecho son el
+// mismo ejercicio — se unifica mostrando siempre "Press de Pecho".
+var ETIQUETAS = {'PRESS BANCA': 'PRESS DE PECHO'};
 function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 
 // Solo en la pantalla de Carga: lo que se anota como "Sentadilla" en la base es siempre
