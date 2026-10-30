@@ -353,17 +353,21 @@ function enviarAviso_() {
   if (!texto) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí un mensaje.'; return; }
   if (destinoTipo == 'JUGADOR' && !destinoValor) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí el nombre del jugador.'; return; }
   if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad.'; return; }
+  var btn = document.getElementById('avEnviarBtn');
+  if (btn.disabled) return;   // evita doble envío por doble tap mientras ya está en curso
+  btn.disabled = true;
   msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
     body: JSON.stringify({token: state.token, action: 'enviarAviso', destinoTipo: destinoTipo, destinoValor: destinoValor, texto: texto})})
     .then(function (r) { return r.json(); })
     .then(function (j) {
+      btn.disabled = false;
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Aviso enviado!';
       document.getElementById('avTexto').value = '';
       cargarAvisos_();
     })
-    .catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+    .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }
 
 // ---------------------------------------------------------------------------
@@ -418,15 +422,19 @@ function enviarCarga_() {
   var repsInvalidas = ejercicios.filter(function (e) { return e.reps && (Number(e.reps) < 1 || Number(e.reps) > 15); });
   if (repsInvalidas.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Reps fuera de rango en ' + repsInvalidas.map(function (e) { return e.nombre; }).join(', ') + ' (tiene que ser de 1 a 15).'; return; }
   if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
+  var btn = document.getElementById('submitBtn');
+  if (btn.disabled) return;   // evita doble envío por doble tap mientras ya está en curso
+  btn.disabled = true;
   msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)})
     .then(function (r) { return r.json(); })
     .then(function (j) {
+      btn.disabled = false;
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Cargado! (' + j.cargados + ' registros)';
       cargarMisDatos_();
     })
-    .catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+    .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }
 
 // ---------------------------------------------------------------------------
