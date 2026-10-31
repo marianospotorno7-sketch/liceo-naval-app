@@ -241,7 +241,7 @@ function renderRankChips_() {
 function tablaRanking_(lista, mePuesto, soyNombre, esMetros) {
   var div = document.createElement('div');
   lista.forEach(function (r, i) {
-    var row = document.createElement('div'); row.className = 'rankrow' + (r.nombre == soyNombre ? ' me' : '');
+    var row = document.createElement('div'); row.className = 'rankrow' + (i == 0 ? ' top1' : '') + (r.nombre == soyNombre ? ' me' : '');
     var pos = document.createElement('div'); pos.className = 'pos'; pos.textContent = (i + 1) + '°';
     var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.nombre;
     var vv = document.createElement('div'); vv.className = 'vv'; vv.textContent = r.v + (esMetros ? ' m' : ' kg');
@@ -292,10 +292,12 @@ function renderAvisos_() {
     cb.appendChild(div);
   });
 
+  var vistos = d.vistosHasta ? new Date(d.vistosHasta).getTime() : 0;
   var list = document.getElementById('avisosList'); list.innerHTML = '';
   if (!d.avisos || !d.avisos.length) { list.innerHTML = '<div class="exempty">Todavía no hay avisos.</div>'; }
   (d.avisos || []).forEach(function (a) {
-    var div = document.createElement('div'); div.className = 'avisocard';
+    var esNuevo = new Date(a.fecha).getTime() > vistos;
+    var div = document.createElement('div'); div.className = 'avisocard' + (esNuevo ? ' unread' : '');
     var meta = document.createElement('div'); meta.className = 'meta';
     meta.textContent = fmtFechaHora_(a.fecha) + (state.esCoach ? ' · ' + destinoTexto_(a) : '');
     var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = a.texto;
