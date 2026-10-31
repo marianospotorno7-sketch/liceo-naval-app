@@ -39,12 +39,14 @@ button{font-family:var(--sans);}
 input,select{font-family:var(--sans);}
 
 /* ---------- Login ---------- */
-#loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;}
+#loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;
+  background:linear-gradient(180deg, #080d1459 0%, #080d1433 45%, #080d1480 100%), url('./login-bg.webp') center/cover no-repeat, var(--bg);}
 #loginScreen img{width:96px;height:96px;border-radius:50%;box-shadow:0 0 0 3px var(--gold-dim),0 10px 30px rgba(0,0,0,.5);}
 #loginScreen h1{font-family:var(--display);font-size:26px;font-weight:800;
   background:linear-gradient(120deg,#fff 0%,#f2f3f5 55%,var(--gold-bright) 130%);
-  -webkit-background-clip:text;background-clip:text;color:transparent;}
-#loginScreen .sub{color:var(--text-dim);font-size:13.5px;max-width:320px;}
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 2px 10px rgba(0,0,0,.7));}
+#loginScreen .sub{color:var(--text-mid);font-size:13.5px;max-width:320px;text-shadow:0 1px 8px rgba(0,0,0,.8);}
 #gBtn{margin-top:6px;}
 #loginMsg{font-family:var(--mono);font-size:12px;color:var(--red);max-width:320px;}
 #ingresoLink{font-family:var(--mono);font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--border2);padding:10px 16px;border-radius:20px;}
