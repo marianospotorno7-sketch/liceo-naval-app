@@ -174,6 +174,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
       <div class="statbox"><div class="num" id="statTotal">—</div><div class="lbl">Cargas totales</div></div>
       <div class="statbox"><div class="num" id="statMes">—</div><div class="lbl">Este mes</div></div>
     </div>
+    <div class="statrow">
+      <div class="statbox"><div class="num" id="statPeso">—</div><div class="lbl">Peso actual (kg)</div></div>
+      <div class="statbox"><div class="num" id="statAltura">—</div><div class="lbl">Altura actual (cm)</div></div>
+    </div>
     <div class="exgroup-title">Potencia</div>
     <div id="grupoPotencia"></div>
     <div class="exgroup-title">Fuerza</div>
@@ -231,13 +235,19 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold);text-transform
         <input type="text" inputmode="decimal" id="cSalto" placeholder="ej. 2.40">
       </div>
       <div class="fitem">
+        <div class="lastmark" id="lastPeso"></div>
         <label>Peso corporal (kg) — una vez por semana</label>
         <input type="text" inputmode="decimal" id="cPeso" placeholder="ej. 82.5">
       </div>
       <div class="fitem">
-        <label>RPE sesión: <span id="rpeVal">5</span></label>
-        <input type="range" min="0" max="10" value="5" id="cRpe">
-        <div class="lastmark" id="rpeEscala" style="margin-top:6px;margin-bottom:0;">0 Reposo · 3 Moderada · 5 Dura · 7 Muy dura · 10 Máximo</div>
+        <div class="lastmark" id="lastAltura"></div>
+        <label>Altura (cm) — cada tanto, no hace falta todas las semanas</label>
+        <input type="text" inputmode="decimal" id="cAltura" placeholder="ej. 178">
+      </div>
+      <div class="fitem">
+        <label>RPE sesión: <span id="rpeVal">3</span></label>
+        <input type="range" min="1" max="5" value="3" id="cRpe">
+        <div class="lastmark" id="rpeEscala" style="margin-top:6px;margin-bottom:0;">1 Muy suave · 2 Suave · 3 Moderada · 4 Dura · 5 Máxima</div>
       </div>
       <div class="fitem">
         <label>Duración (min)</label>

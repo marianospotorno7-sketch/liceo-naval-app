@@ -64,7 +64,7 @@ function datosDemoMisDatos_() {
     var s = serie(p[1], p[2]);
     ej[p[0]] = {evolucion: s, actual: s[s.length - 1].valor, record: Math.max.apply(null, s.map(function (x) { return x.valor; })), fechaRecord: s[s.length - 1].fecha};
   });
-  return {nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej};
+  return {nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej, pesoActual: 84.2, alturaActual: 181};
 }
 function datosDemoRanking_() {
   function top(base) {
@@ -213,6 +213,8 @@ function renderMisDatos_(d) {
   document.getElementById('hCamada').textContent = d.puesto || '';
   document.getElementById('statTotal').textContent = d.cargasTotales;
   document.getElementById('statMes').textContent = d.cargasMes;
+  document.getElementById('statPeso').textContent = d.pesoActual != null ? d.pesoActual : '—';
+  document.getElementById('statAltura').textContent = d.alturaActual != null ? d.alturaActual : '—';
 
   var gp = document.getElementById('grupoPotencia'); gp.innerHTML = '';
   EJERCICIOS_POTENCIA.forEach(function (e) { gp.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
@@ -394,6 +396,10 @@ function pintarCamposCarga_() {
   });
   var saltoInfo = state.misDatos && state.misDatos.ejercicios['SALTO HORIZONTAL'];
   document.getElementById('lastSalto').textContent = saltoInfo ? 'Última: ' + saltoInfo.actual + ' m' : '';
+  var pesoInfo = state.misDatos && state.misDatos.pesoActual;
+  document.getElementById('lastPeso').textContent = pesoInfo != null ? 'Último: ' + pesoInfo + ' kg' : '';
+  var alturaInfo = state.misDatos && state.misDatos.alturaActual;
+  document.getElementById('lastAltura').textContent = alturaInfo != null ? 'Última: ' + alturaInfo + ' cm' : '';
   document.getElementById('cFecha').value = new Date().toISOString().slice(0, 10);
 }
 
@@ -416,10 +422,11 @@ function enviarCarga_() {
   if (salto) ejercicios.push({nombre: 'SALTO HORIZONTAL', valor: salto});
   var body = {
     token: state.token, fecha: document.getElementById('cFecha').value,
-    pesoCorporal: document.getElementById('cPeso').value, rpeSesion: document.getElementById('cRpe').value,
+    pesoCorporal: document.getElementById('cPeso').value, altura: document.getElementById('cAltura').value,
+    rpeSesion: document.getElementById('cRpe').value,
     duracionMin: document.getElementById('cMin').value, ejercicios: ejercicios
   };
-  if (!ejercicios.length && !body.pesoCorporal) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá al menos un ejercicio.'; return; }
+  if (!ejercicios.length && !body.pesoCorporal && !body.altura) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá al menos un dato.'; return; }
   var repsInvalidas = ejercicios.filter(function (e) { return e.reps && (Number(e.reps) < 1 || Number(e.reps) > 15); });
   if (repsInvalidas.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Reps fuera de rango en ' + repsInvalidas.map(function (e) { return e.nombre; }).join(', ') + ' (tiene que ser de 1 a 15).'; return; }
   if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
