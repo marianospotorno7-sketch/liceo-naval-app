@@ -105,7 +105,7 @@ function iniciarGoogle(intentos) {
     return;
   }
   google.accounts.id.initialize({client_id: CONFIG.CLIENT_ID, callback: onGoogleLogin_});
-  google.accounts.id.renderButton(document.getElementById('gBtn'), {theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with'});
+  google.accounts.id.renderButton(document.getElementById('gBtn'), {theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with'});
 }
 
 function onGoogleLogin_(resp) {
