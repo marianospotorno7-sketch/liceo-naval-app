@@ -122,6 +122,18 @@ function salir_() {
   document.querySelectorAll('.tab').forEach(function (t) { t.style.display = ''; });
 }
 
+// El token de Google dura ~1 hora. Si quedó uno viejo en localStorage, entrarAlApp_() lo usa
+// igual (no hay forma de saber que venció sin preguntarle al backend) y recién ahí el backend
+// lo rechaza. Antes ese rechazo cualquier error no reconocido se trataba como "modo demo" --
+// el jugador terminaba viendo datos de ejemplo sin ningún botón para volver a entrar de verdad
+// (iniciarGoogle() nunca se había llamado esa carga de página). Ahora se distingue ese caso
+// puntual y se manda de nuevo a loguearse.
+function sesionVencida_() {
+  salir_();
+  document.getElementById('loginMsg').textContent = 'Tu sesión venció, volvé a entrar con Google.';
+  iniciarGoogle();
+}
+
 function entrarAlApp_() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
@@ -140,6 +152,7 @@ function backendGet_(action) {
       if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
       mostrarSinVincular_(); return Promise.reject('sin-vincular');
     }
+    if (j.error == 'No autorizado' && state.token != 'demo') { sesionVencida_(); return Promise.reject('no-autorizado'); }
     if (j.error) return Promise.reject(j.error);
     return j;
   });
@@ -167,17 +180,17 @@ function marcarDemo_(si) { document.getElementById('demoBanner').classList.toggl
 
 function cargarMisDatos_() {
   backendGet_('misdatos').then(function (d) { marcarDemo_(false); state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
-    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach') return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
+    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach' || err == 'no-autorizado') return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
 }
 
 function cargarRanking_() {
   backendGet_('ranking').then(function (d) { marcarDemo_(false); state.ranking = d; renderRanking_(); })
-    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach') return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach' || err == 'no-autorizado') return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
 }
 
 function cargarAvisos_() {
   backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; state.jugadoresLista = d.jugadores || []; renderAvisos_(); actualizarBadge_(); })
-    .catch(function (err) { if (err == 'sin-vincular') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; renderAvisos_(); actualizarBadge_(); });
+    .catch(function (err) { if (err == 'sin-vincular' || err == 'no-autorizado') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; renderAvisos_(); actualizarBadge_(); });
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +380,7 @@ function enviarAviso_() {
     .then(function (r) { return r.json(); })
     .then(function (j) {
       btn.disabled = false;
+      if (j.error == 'No autorizado') { sesionVencida_(); return; }
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Aviso enviado!';
       document.getElementById('avTexto').value = '';
@@ -440,6 +454,7 @@ function enviarCarga_() {
     .then(function (r) { return r.json(); })
     .then(function (j) {
       btn.disabled = false;
+      if (j.error == 'No autorizado') { sesionVencida_(); return; }
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Cargado! (' + j.cargados + ' registros)';
       cargarMisDatos_();
