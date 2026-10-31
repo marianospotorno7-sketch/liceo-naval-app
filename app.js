@@ -291,6 +291,7 @@ function destinoTexto_(a) {
   if (a.destinoTipo == 'TODOS') return 'A todos';
   if (a.destinoTipo == 'CAMADA') return 'A ' + a.destinoValor;
   if (a.destinoTipo == 'JUGADOR') return 'A ' + a.destinoValor;
+  if (a.destinoTipo == 'COACH') return 'Solo vos';
   return '';
 }
 
