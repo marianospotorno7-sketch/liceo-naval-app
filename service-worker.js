@@ -1,7 +1,7 @@
 // Cache mínimo del shell de la app. Los datos (Mis Datos / Ranking / Carga) nunca se cachean:
 // siempre se piden en vivo al backend, autenticados. Subir CACHE_VERSION en cada deploy para
 // forzar a los celulares a bajar la versión nueva.
-const CACHE_VERSION = 'liceo-app-v10';
+const CACHE_VERSION = 'liceo-app-v11';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
