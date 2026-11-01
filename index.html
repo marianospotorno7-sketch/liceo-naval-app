@@ -214,6 +214,8 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     <div id="grupoFuerza"></div>
     <div class="exgroup-title">Salto</div>
     <div id="grupoSalto"></div>
+    <div class="exgroup-title">Campo</div>
+    <div id="grupoCampo"></div>
   </section>
 
   <!-- -------- Ranking -------- -->
@@ -258,6 +260,20 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     </fieldset>
 
     <fieldset>
+      <legend>Campo</legend>
+      <div class="fitem">
+        <div class="lastmark" id="lastBronco"></div>
+        <label>Bronco (segundos)</label>
+        <input type="text" inputmode="decimal" id="cBronco" placeholder="ej. 312.4">
+      </div>
+      <div class="fitem">
+        <div class="lastmark" id="lastVelMax"></div>
+        <label>Vel Max (km/h)</label>
+        <input type="text" inputmode="decimal" id="cVelMax" placeholder="ej. 28.3">
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Salto y cierre</legend>
       <div class="fitem">
         <div class="lastmark" id="lastSalto"></div>
@@ -291,6 +307,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 
   <!-- -------- Avisos -------- -->
   <section class="screen" id="screenAvisos">
+    <div id="solicitudesBox" class="hidden"></div>
     <div id="composeBox" class="hidden">
       <div class="exgroup-title">Escribir un aviso</div>
       <div class="fitem">

@@ -22,6 +22,11 @@ var EJERCICIOS_FUERZA = ['SENTADILLA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA',
 // que no se muestran en Mis Datos ni en el Ranking (pedido de Mariano, 29/10: Sentadilla Media
 // — el dato queda guardado en la base, simplemente no se ve en la app salvo al cargarlo).
 var EJERCICIOS_FUERZA_CARGA = ['SENTADILLA', 'SENTADILLA MEDIA', 'PESO MUERTO', 'DESPEGUE', 'PRESS BANCA', 'PRESS HOMBRO', 'DOMINADAS'];
+// Campo: tiene que ser EXACTAMENTE la misma lista que RANKING_CAMPO en el backend.
+var EJERCICIOS_CAMPO = ['BRONCO', 'VEL MAX'];
+// Unidad para mostrar cada ejercicio en Mis Datos y Ranking (todo lo que no está acá es 'kg').
+var UNIDAD_EJ = {'SALTO HORIZONTAL': 'm', 'BRONCO': 's', 'VEL MAX': 'km/h'};
+function unidadEj_(ej) { return UNIDAD_EJ[ej] || 'kg'; }
 var CAMPO_ID = {
   'ARRANQUE': 'campoArranque', 'TIRÓN DE ARRANQUE': 'campoTironArranque', 'CARGADA': 'campoCargada',
   'TIRÓN DE CARGADA': 'campoTironCargada', 'SENTADILLA': 'campoSentadilla',
@@ -40,7 +45,7 @@ function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 var ETIQUETAS_CARGA = {'SENTADILLA': 'SENTADILLA PROFUNDA'};
 function etiquetaCarga_(nombre) { return ETIQUETAS_CARGA[nombre] || etiqueta_(nombre); }
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false, jugadoresLista: []};
+var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false, jugadoresLista: [], solicitudes: []};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -60,22 +65,32 @@ function datosDemoMisDatos_() {
   }
   var ej = {};
   [['ARRANQUE', 55, 2.5], ['CARGADA', 70, 2.5], ['SENTADILLA', 110, 2.5], ['PESO MUERTO', 140, 2.5], ['DESPEGUE', 90, 2.5],
-   ['PRESS BANCA', 85, 2.5], ['PRESS HOMBRO', 50, 2.5], ['DOMINADAS', 90, 2.5], ['SALTO HORIZONTAL', 2.3, 0.05]].forEach(function (p) {
+   ['PRESS BANCA', 85, 2.5], ['PRESS HOMBRO', 50, 2.5], ['DOMINADAS', 90, 2.5], ['SALTO HORIZONTAL', 2.3, 0.05],
+   ['VEL MAX', 26, 0.3]].forEach(function (p) {
     var s = serie(p[1], p[2]);
     ej[p[0]] = {evolucion: s, actual: s[s.length - 1].valor, record: Math.max.apply(null, s.map(function (x) { return x.valor; })), fechaRecord: s[s.length - 1].fecha};
   });
+  // Bronco: a diferencia del resto, el récord (y el mejor valor) es el MENOR, no el mayor.
+  var sBronco = serie(320, -4);
+  ej.BRONCO = {evolucion: sBronco, actual: sBronco[sBronco.length - 1].valor, record: Math.min.apply(null, sBronco.map(function (x) { return x.valor; })), fechaRecord: sBronco[sBronco.length - 1].fecha};
   return {nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej, pesoActual: 84.2, alturaActual: 181};
 }
 function datosDemoRanking_() {
-  function top(base) {
+  // menor: el mejor valor es el más bajo (Bronco). conRel: si tiene sentido mostrar 1RM/peso
+  // (no aplica a Campo: Bronco es tiempo, Vel Max es km/h, ninguno es un cociente contra el peso).
+  function top(base, menor, conRel) {
     var nombres = ['Pérez Juan', 'Gómez Lucas', 'Fernández Tomás', 'Rodríguez Nico', 'Jugador de ejemplo', 'López Fede', 'García Iñaki'];
-    return nombres.map(function (n, i) { var v = base - i * 4; return {nombre: n, v: v, rel: v / 85}; });
+    return nombres.map(function (n, i) { var v = menor ? base + i * 4 : base - i * 4; return {nombre: n, v: v, rel: conRel ? v / 85 : null}; });
   }
   var out = {};
   EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).forEach(function (e, i) {
-    var t = top(100 - i * 3);
+    var t = top(100 - i * 3, false, true);
     out[e] = {club: t, camada: t.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
   });
+  var tv = top(73, false, false);
+  out['VEL MAX'] = {club: tv, camada: tv.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
+  var tb = top(290, true, false);
+  out.BRONCO = {club: tb, camada: tb.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
   return {nombre: 'Jugador de ejemplo', camada: 'M17', ranking: out};
 }
 function datosDemoAvisos_() {
@@ -86,7 +101,8 @@ function datosDemoAvisos_() {
     avisos: [
       {id: '1', fecha: new Date(hoy.getTime() - 3600000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'TODOS', texto: 'Mañana entrenamos 1 hora más temprano.'},
       {id: '2', fecha: new Date(hoy.getTime() - 86400000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'CAMADA', destinoValor: 'M17', texto: 'Buen laburo esta semana, M17.'}
-    ]
+    ],
+    solicitudes: []
   };
 }
 
@@ -152,6 +168,8 @@ function backendGet_(action) {
       if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
       mostrarSinVincular_(); return Promise.reject('sin-vincular');
     }
+    if (j.error == 'PENDIENTE_APROBACION') { mostrarPendiente_(); return Promise.reject('pendiente'); }
+    if (j.error == 'RECHAZADO') { mostrarRechazado_(); return Promise.reject('rechazado'); }
     if (j.error == 'No autorizado' && state.token != 'demo') { sesionVencida_(); return Promise.reject('no-autorizado'); }
     if (j.error) return Promise.reject(j.error);
     return j;
@@ -163,6 +181,17 @@ function mostrarSinVincular_() {
   document.getElementById('loginMsg').textContent = 'Tu cuenta de Google todavía no está vinculada a un jugador.';
   var a = document.getElementById('ingresoLink');
   if (CONFIG.FORM_INGRESO_URL.indexOf('PENDIENTE') < 0) { a.href = CONFIG.FORM_INGRESO_URL; a.classList.remove('hidden'); }
+}
+
+// Ya completó el form de ingreso (está vinculado) pero el cuerpo técnico todavía no lo aprobó.
+function mostrarPendiente_() {
+  salir_();
+  document.getElementById('loginMsg').textContent = 'Tu solicitud le llegó al cuerpo técnico y está esperando aprobación. En cuanto te aprueben, volvé a entrar con Google.';
+}
+
+function mostrarRechazado_() {
+  salir_();
+  document.getElementById('loginMsg').textContent = 'Tu solicitud fue rechazada. Si pensás que es un error, hablalo con el cuerpo técnico.';
 }
 
 // El coach (COACH_EMAILS en el backend) no tiene por qué tener fila de jugador: entra directo
@@ -178,19 +207,22 @@ function entrarComoCoach_() {
 
 function marcarDemo_(si) { document.getElementById('demoBanner').classList.toggle('hidden', !si); state.demo = si; }
 
+// Errores que ya muestran su propia pantalla (login) y no tienen que caer en modo demo.
+var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'no-autorizado', 'pendiente', 'rechazado'];
+
 function cargarMisDatos_() {
   backendGet_('misdatos').then(function (d) { marcarDemo_(false); state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
-    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach' || err == 'no-autorizado') return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
 }
 
 function cargarRanking_() {
   backendGet_('ranking').then(function (d) { marcarDemo_(false); state.ranking = d; renderRanking_(); })
-    .catch(function (err) { if (err == 'sin-vincular' || err == 'es-coach' || err == 'no-autorizado') return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
 }
 
 function cargarAvisos_() {
-  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; state.jugadoresLista = d.jugadores || []; renderAvisos_(); actualizarBadge_(); })
-    .catch(function (err) { if (err == 'sin-vincular' || err == 'no-autorizado') return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; renderAvisos_(); actualizarBadge_(); });
+  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || []; renderAvisos_(); actualizarBadge_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; state.solicitudes = []; renderAvisos_(); actualizarBadge_(); });
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +269,9 @@ function renderMisDatos_(d) {
 
   var gs = document.getElementById('grupoSalto'); gs.innerHTML = '';
   gs.appendChild(tarjetaEj_('SALTO HORIZONTAL', d.ejercicios['SALTO HORIZONTAL'], 'm'));
+
+  var gc = document.getElementById('grupoCampo'); gc.innerHTML = '';
+  EJERCICIOS_CAMPO.forEach(function (e) { gc.appendChild(tarjetaEj_(e, d.ejercicios[e], unidadEj_(e))); });
 }
 
 // ---------------------------------------------------------------------------
@@ -244,20 +279,20 @@ function renderMisDatos_(d) {
 // ---------------------------------------------------------------------------
 function renderRankChips_() {
   var cont = document.getElementById('rankChips'); cont.innerHTML = '';
-  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).forEach(function (e) {
+  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).concat(EJERCICIOS_CAMPO).forEach(function (e) {
     var b = document.createElement('button'); b.className = 'chip' + (e == state.rankingEj ? ' active' : '');
     b.textContent = etiqueta_(e); b.onclick = function () { state.rankingEj = e; renderRanking_(); };
     cont.appendChild(b);
   });
 }
 
-function tablaRanking_(lista, mePuesto, soyNombre, esMetros) {
+function tablaRanking_(lista, mePuesto, soyNombre, unidad) {
   var div = document.createElement('div');
   lista.forEach(function (r, i) {
     var row = document.createElement('div'); row.className = 'rankrow' + (i == 0 ? ' top1' : '') + (r.nombre == soyNombre ? ' me' : '');
     var pos = document.createElement('div'); pos.className = 'pos'; pos.textContent = (i + 1) + '°';
     var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.nombre;
-    var vv = document.createElement('div'); vv.className = 'vv'; vv.textContent = r.v + (esMetros ? ' m' : ' kg');
+    var vv = document.createElement('div'); vv.className = 'vv'; vv.textContent = r.v + ' ' + unidad;
     var rr = document.createElement('div'); rr.className = 'rr'; rr.textContent = r.rel ? r.rel.toFixed(2) + 'x' : '';
     row.appendChild(pos); row.appendChild(nm); row.appendChild(vv); row.appendChild(rr);
     div.appendChild(row);
@@ -269,13 +304,13 @@ function renderRanking_() {
   renderRankChips_();
   if (!state.ranking) return;
   var r = state.ranking.ranking[state.rankingEj];
-  var esMetros = state.rankingEj == 'SALTO HORIZONTAL';
+  var unidad = unidadEj_(state.rankingEj);
   var nm = state.ranking.nombre;
 
-  var cc = document.getElementById('rankCamada'); cc.innerHTML = ''; cc.appendChild(tablaRanking_(r.camada, r.miPuestoCamada, nm, esMetros));
+  var cc = document.getElementById('rankCamada'); cc.innerHTML = ''; cc.appendChild(tablaRanking_(r.camada, r.miPuestoCamada, nm, unidad));
   document.getElementById('miPosCamada').textContent = r.miPuestoCamada ? 'Tu puesto en la camada: ' + r.miPuestoCamada + '°' : 'Todavía no tenés cargas de este ejercicio';
 
-  var cl = document.getElementById('rankClub'); cl.innerHTML = ''; cl.appendChild(tablaRanking_(r.club, r.miPuestoClub, nm, esMetros));
+  var cl = document.getElementById('rankClub'); cl.innerHTML = ''; cl.appendChild(tablaRanking_(r.club, r.miPuestoClub, nm, unidad));
   document.getElementById('miPosClub').textContent = r.miPuestoClub ? 'Tu puesto en el club: ' + r.miPuestoClub + '°' : 'Todavía no tenés cargas de este ejercicio';
 }
 
@@ -295,9 +330,54 @@ function destinoTexto_(a) {
   return '';
 }
 
+function renderSolicitudes_() {
+  var box = document.getElementById('solicitudesBox');
+  var lista = state.solicitudes || [];
+  box.classList.toggle('hidden', !state.esCoach || !lista.length);
+  if (!state.esCoach || !lista.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '';
+  var titulo = document.createElement('div'); titulo.className = 'exgroup-title';
+  titulo.textContent = 'Solicitudes pendientes (' + lista.length + ')';
+  box.appendChild(titulo);
+  var msg = document.createElement('div'); msg.id = 'solicitudMsg';
+  msg.style.cssText = 'font-family:var(--mono);font-size:12px;margin-bottom:10px;min-height:16px;';
+  box.appendChild(msg);
+  lista.forEach(function (s) {
+    var div = document.createElement('div'); div.className = 'avisocard unread';
+    var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = (s.camada || 'sin camada') + ' · ' + (s.puesto || 'sin puesto');
+    var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = s.nombre + ' — ' + s.email;
+    var botones = document.createElement('div'); botones.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+    var ok = document.createElement('button'); ok.textContent = 'Aprobar';
+    ok.style.cssText = 'flex:1;background:var(--green);border:none;color:#06222e;font-weight:800;font-family:var(--sans);font-size:13px;padding:9px;border-radius:9px;cursor:pointer;';
+    ok.onclick = function () { resolverSolicitud_(s.email, true, s.nombre); };
+    var no = document.createElement('button'); no.textContent = 'Rechazar';
+    no.style.cssText = 'flex:1;background:var(--panel2);border:1px solid var(--border2);color:var(--text-mid);font-weight:700;font-family:var(--sans);font-size:13px;padding:9px;border-radius:9px;cursor:pointer;';
+    no.onclick = function () { resolverSolicitud_(s.email, false, s.nombre); };
+    botones.appendChild(ok); botones.appendChild(no);
+    div.appendChild(meta); div.appendChild(texto); div.appendChild(botones);
+    box.appendChild(div);
+  });
+}
+
+function resolverSolicitud_(email, aprobar, nombre) {
+  if (!configLista_()) return;
+  var msg = document.getElementById('solicitudMsg');
+  msg.style.color = 'var(--text-dim)'; msg.textContent = (aprobar ? 'Aprobando' : 'Rechazando') + ' a ' + nombre + '…';
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'resolverSolicitud', email: email, aprobar: aprobar})})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
+      msg.style.color = 'var(--green)'; msg.textContent = (aprobar ? '¡Aprobado! ' : 'Rechazado. ') + j.nombre;
+      cargarAvisos_();
+    })
+    .catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+}
+
 function renderAvisos_() {
   var d = state.avisos; if (!d) return;
   document.getElementById('composeBox').classList.toggle('hidden', !d.esCoach);
+  renderSolicitudes_();
 
   var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
   (d.cumpleanos || []).forEach(function (c) {
@@ -323,10 +403,17 @@ function renderAvisos_() {
 function actualizarBadge_() {
   var badge = document.getElementById('avBadge');
   var d = state.avisos;
-  if (!d || !d.avisos) { badge.classList.add('hidden'); return; }
+  if (!d) { badge.classList.add('hidden'); return; }
+  if (state.esCoach) {
+    var pendientes = (state.solicitudes || []).length;
+    if (pendientes > 0) { badge.textContent = pendientes > 9 ? '9+' : pendientes; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+    return;
+  }
+  if (!d.avisos) { badge.classList.add('hidden'); return; }
   var vistos = d.vistosHasta ? new Date(d.vistosHasta).getTime() : 0;
   var noLeidos = d.avisos.filter(function (a) { return new Date(a.fecha).getTime() > vistos; }).length;
-  if (noLeidos > 0 && !state.esCoach) { badge.textContent = noLeidos > 9 ? '9+' : noLeidos; badge.classList.remove('hidden'); }
+  if (noLeidos > 0) { badge.textContent = noLeidos > 9 ? '9+' : noLeidos; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
 }
 
@@ -413,6 +500,10 @@ function pintarCamposCarga_() {
   });
   var saltoInfo = state.misDatos && state.misDatos.ejercicios['SALTO HORIZONTAL'];
   document.getElementById('lastSalto').textContent = saltoInfo ? 'Última: ' + saltoInfo.actual + ' m' : '';
+  var broncoInfo = state.misDatos && state.misDatos.ejercicios['BRONCO'];
+  document.getElementById('lastBronco').textContent = broncoInfo ? 'Última: ' + broncoInfo.actual + ' s' : '';
+  var velMaxInfo = state.misDatos && state.misDatos.ejercicios['VEL MAX'];
+  document.getElementById('lastVelMax').textContent = velMaxInfo ? 'Última: ' + velMaxInfo.actual + ' km/h' : '';
   var pesoInfo = state.misDatos && state.misDatos.pesoActual;
   document.getElementById('lastPeso').textContent = pesoInfo != null ? 'Último: ' + pesoInfo + ' kg' : '';
   var alturaInfo = state.misDatos && state.misDatos.alturaActual;
@@ -437,6 +528,10 @@ function enviarCarga_() {
   var ejercicios = recolectarEjercicios_();
   var salto = document.getElementById('cSalto').value;
   if (salto) ejercicios.push({nombre: 'SALTO HORIZONTAL', valor: salto});
+  var bronco = document.getElementById('cBronco').value;
+  if (bronco) ejercicios.push({nombre: 'BRONCO', valor: bronco});
+  var velMax = document.getElementById('cVelMax').value;
+  if (velMax) ejercicios.push({nombre: 'VEL MAX', valor: velMax});
   var body = {
     token: state.token, fecha: document.getElementById('cFecha').value,
     pesoCorporal: document.getElementById('cPeso').value, altura: document.getElementById('cAltura').value,
