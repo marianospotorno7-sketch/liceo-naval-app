@@ -110,6 +110,19 @@ nav.tabs button.active{color:var(--accent);border-top-color:var(--accent);backgr
 .chip{flex-shrink:0;font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--border2);
   color:var(--text-mid);padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#06222e;font-weight:700;}
+
+/* ---------- Pastillas (grupos de Ranking, Gym/Campo/Partido en Carga) ---------- */
+.pillrow{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--border2);border-radius:14px;padding:4px;margin-bottom:16px;}
+.pill{flex:1;font-family:var(--sans);font-weight:700;font-size:12.5px;background:none;border:none;color:var(--text-mid);
+  padding:10px 6px;border-radius:10px;cursor:pointer;white-space:nowrap;}
+.pill.active{background:var(--accent);color:#06222e;}
+
+.btnrow{display:flex;gap:8px;margin:10px 0 18px;flex-wrap:wrap;}
+.btn2{flex:1;min-width:120px;background:var(--panel2);border:1px solid var(--border2);color:var(--text-mid);
+  font-weight:700;font-family:var(--sans);font-size:12.5px;padding:10px 12px;border-radius:10px;cursor:pointer;}
+.btn2:active{background:var(--accent-dim);}
+.btn-outline{width:100%;background:none;border:1px solid var(--accent);color:var(--accent);font-weight:700;
+  font-family:var(--sans);font-size:13px;padding:11px;border-radius:12px;cursor:pointer;margin-bottom:14px;}
 .rankbox{background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:14px 15px;margin-bottom:14px;}
 .rankbox h3{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
 .rankrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #171b21;font-size:12.5px;}
@@ -167,6 +180,17 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 #avJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
 #avJugadorSugerencias .sug:last-child{border-bottom:none;}
 #avJugadorSugerencias .sug:hover{background:var(--accent-dim);}
+
+/* ---------- Imprimir / PDF: solo la vista activa, sin nav ni chrome ---------- */
+@media print{
+  body{background:#fff;color:#111;}
+  nav.tabs, header.topbar, .btnrow, .btn-outline, #logoutBtn, #demoBanner, .pillrow, fieldset#cargaCierre,
+  #submitBtn, #partidoBtn, #cargaMsg, #partidoMsg{display:none !important;}
+  .screen{display:none !important;}
+  .screen.active{display:block !important;}
+  .excard, .rankbox, .avisocard{background:#fff;border:1px solid #ccc;color:#111;}
+  .exval, .vv, .exrecord, .rankrow .nm{color:#111 !important;}
+}
 </style>
 </head>
 <body>
@@ -226,6 +250,8 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
   <!-- -------- Ranking -------- -->
   <section class="screen" id="screenRanking">
     <div id="coachPartidosBox" class="hidden">
+      <button id="verComoJugadorBtn" class="btn-outline">👁 Ver como jugador</button>
+      <div id="previewJugadorBox" class="hidden"></div>
       <div class="exgroup-title">Partidos y lesiones</div>
       <div class="fitem">
         <label>Camada</label>
@@ -238,8 +264,32 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
       <div id="coachFaltanBox"></div>
       <div id="coachInformeBox"></div>
       <div id="coachLesionesBox"></div>
+      <div class="btnrow" id="coachExportBox">
+        <button class="btn2" id="imprimirBtn">🖨 Imprimir / PDF</button>
+        <button class="btn2" id="excelBtn">⬇️ Descargar Excel</button>
+        <button class="btn2" id="mailBtn">✉️ Enviar por mail</button>
+      </div>
+      <div id="mailBox" class="hidden">
+        <div class="fitem">
+          <label>Mandar a</label>
+          <select id="mailDestino">
+            <option value="YO">A mí</option>
+            <option value="PFS">Todos los PFs</option>
+            <option value="CLUB">Todo el club</option>
+            <option value="EQUIPO">Todo el equipo</option>
+            <option value="JUGADOR">Un jugador</option>
+          </select>
+        </div>
+        <div class="fitem hidden" id="mailJugadorWrap">
+          <label>Nombre del jugador</label>
+          <input type="text" id="mailJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
+        </div>
+        <button id="mailEnviarBtn" class="btn-outline" style="margin-bottom:0;">Enviar</button>
+        <div id="mailMsg" style="text-align:center;font-family:var(--mono);font-size:12px;margin-top:8px;"></div>
+      </div>
     </div>
     <div id="miRankingBox">
+      <div class="pillrow" id="rankGrupos"></div>
       <div class="chiprow" id="rankChips"></div>
       <div class="rankbox">
         <h3>Top 10 — tu camada</h3>
@@ -254,53 +304,84 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     </div>
   </section>
 
+  <!-- -------- Revisar (solo coach) -------- -->
+  <section class="screen" id="screenRevisar">
+    <div class="exgroup-title">🗂 Revisar</div>
+    <div class="fitem">
+      <label>Camada</label>
+      <select id="revisarCamada">
+        <option value="TODAS">Todas las mías</option>
+        <option value="M15">M15</option><option value="M16">M16</option><option value="M17">M17</option>
+        <option value="M19">M19</option><option value="PLANTEL">PLANTEL</option><option value="G2 PS">G2 PS</option>
+      </select>
+    </div>
+    <div id="revisarList"></div>
+  </section>
+
   <!-- -------- Carga -------- -->
   <section class="screen" id="screenCarga">
-    <div class="fitem">
+    <div class="pillrow" id="cargaPills">
+      <button class="pill active" data-carga="gym">🏋 Gym</button>
+      <button class="pill" data-carga="campo">🏃 Campo</button>
+      <button class="pill" data-carga="partido">🏉 Partido</button>
+    </div>
+
+    <div class="fitem" id="cFechaWrap">
       <label>Fecha</label>
       <input type="date" id="cFecha">
     </div>
 
-    <fieldset>
-      <legend>Potencia</legend>
-      <div id="campoArranque"></div>
-      <div id="campoTironArranque"></div>
-      <div id="campoCargada"></div>
-      <div id="campoTironCargada"></div>
-    </fieldset>
+    <div id="cargaGymPanel">
+      <fieldset>
+        <legend>Potencia</legend>
+        <div id="campoArranque"></div>
+        <div id="campoTironArranque"></div>
+        <div id="campoCargada"></div>
+        <div id="campoTironCargada"></div>
+      </fieldset>
 
-    <fieldset>
-      <legend>Fuerza</legend>
-      <div id="campoSentadilla"></div>
-      <div id="campoSentadillaMedia"></div>
-      <div id="campoPesoMuerto"></div>
-      <div id="campoDespegue"></div>
-      <div id="campoPressBanca"></div>
-      <div id="campoPressHombro"></div>
-      <div id="campoDominadas"></div>
-    </fieldset>
+      <fieldset>
+        <legend>Fuerza</legend>
+        <div id="campoSentadilla"></div>
+        <div id="campoSentadillaMedia"></div>
+        <div id="campoPesoMuerto"></div>
+        <div id="campoDespegue"></div>
+        <div id="campoPressBanca"></div>
+        <div id="campoPressHombro"></div>
+        <div id="campoDominadas"></div>
+      </fieldset>
 
-    <fieldset>
-      <legend>Campo</legend>
-      <div class="fitem">
-        <div class="lastmark" id="lastBronco"></div>
-        <label>Bronco (segundos)</label>
-        <input type="text" inputmode="decimal" id="cBronco" placeholder="ej. 312.4">
-      </div>
-      <div class="fitem">
-        <div class="lastmark" id="lastVelMax"></div>
-        <label>Vel Max (km/h)</label>
-        <input type="text" inputmode="decimal" id="cVelMax" placeholder="ej. 28.3">
-      </div>
-    </fieldset>
+      <fieldset>
+        <legend>Salto</legend>
+        <div class="fitem">
+          <div class="lastmark" id="lastSalto"></div>
+          <label>Salto horizontal (m)</label>
+          <input type="text" inputmode="decimal" id="cSalto" placeholder="ej. 2.40">
+        </div>
+      </fieldset>
+    </div>
 
-    <fieldset>
-      <legend>Salto y cierre</legend>
-      <div class="fitem">
-        <div class="lastmark" id="lastSalto"></div>
-        <label>Salto horizontal (m)</label>
-        <input type="text" inputmode="decimal" id="cSalto" placeholder="ej. 2.40">
-      </div>
+    <div id="cargaCampoPanel" class="hidden">
+      <fieldset>
+        <legend>Tests de campo</legend>
+        <div class="fitem">
+          <div class="lastmark" id="lastBronco"></div>
+          <label>Bronco</label>
+          <div class="exrow2">
+            <input type="text" inputmode="numeric" id="cBroncoMin" placeholder="min, ej. 4">
+            <input type="text" inputmode="numeric" id="cBroncoSeg" placeholder="seg, ej. 35">
+          </div>
+        </div>
+        <div class="fitem">
+          <div class="lastmark" id="lastVelMax"></div>
+          <label>Vel Max (km/h)</label>
+          <input type="text" inputmode="decimal" id="cVelMax" placeholder="ej. 28.3">
+        </div>
+      </fieldset>
+    </div>
+
+    <fieldset id="cargaCierre">
+      <legend>Cierre de sesión</legend>
       <div class="fitem">
         <div class="lastmark" id="lastPeso"></div>
         <label>Peso corporal (kg) — una vez por semana</label>
@@ -322,43 +403,45 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
       </div>
     </fieldset>
 
-    <button id="submitBtn">Cargar sesión</button>
+    <button id="submitBtn">Cargar sesión de gym</button>
     <div id="cargaMsg"></div>
 
-    <fieldset>
-      <legend>Partido</legend>
-      <div class="lastmark" id="lastPartido"></div>
-      <div class="fitem">
-        <label>Fecha del partido</label>
-        <input type="date" id="pFecha">
-      </div>
-      <div class="fitem">
-        <label>Equipo</label>
-        <select id="pEquipo"><option value="">Elegí el equipo</option></select>
-      </div>
-      <div class="fitem">
-        <label>Minutos jugados</label>
-        <input type="text" inputmode="numeric" id="pMinutos" placeholder="ej. 60">
-      </div>
-      <div class="fitem">
-        <label>¿Hubo lesión?</label>
-        <select id="pLesion">
-          <option value="NO">No</option>
-          <option value="DURANTE EL PARTIDO">Sí, durante el partido</option>
-          <option value="SEMANA PREVIA">Sí, en la semana previa</option>
-        </select>
-      </div>
-      <div class="fitem hidden" id="pZonaWrap">
-        <label>Zona</label>
-        <select id="pZona"><option value="">Elegí la zona</option></select>
-      </div>
-      <div class="fitem hidden" id="pDetalleWrap">
-        <label>¿Cuál? (hasta 50 caracteres)</label>
-        <input type="text" id="pDetalle" maxlength="50" placeholder="ej. esguince de tobillo">
-      </div>
-    </fieldset>
-    <button id="partidoBtn">Cargar partido</button>
-    <div id="partidoMsg"></div>
+    <div id="cargaPartidoPanel" class="hidden">
+      <fieldset>
+        <legend>Partido</legend>
+        <div class="lastmark" id="lastPartido"></div>
+        <div class="fitem">
+          <label>Fecha del partido</label>
+          <input type="date" id="pFecha">
+        </div>
+        <div class="fitem">
+          <label>Equipo</label>
+          <select id="pEquipo"><option value="">Elegí el equipo</option></select>
+        </div>
+        <div class="fitem">
+          <label>Minutos jugados</label>
+          <input type="text" inputmode="numeric" id="pMinutos" placeholder="ej. 60">
+        </div>
+        <div class="fitem">
+          <label>¿Hubo lesión?</label>
+          <select id="pLesion">
+            <option value="NO">No</option>
+            <option value="DURANTE EL PARTIDO">Sí, durante el partido</option>
+            <option value="SEMANA PREVIA">Sí, en la semana previa</option>
+          </select>
+        </div>
+        <div class="fitem hidden" id="pZonaWrap">
+          <label>Zona</label>
+          <select id="pZona"><option value="">Elegí la zona</option></select>
+        </div>
+        <div class="fitem hidden" id="pDetalleWrap">
+          <label>¿Cuál? (hasta 50 caracteres)</label>
+          <input type="text" id="pDetalle" maxlength="50" placeholder="ej. esguince de tobillo">
+        </div>
+      </fieldset>
+      <button id="partidoBtn">Cargar partido</button>
+      <div id="partidoMsg"></div>
+    </div>
   </section>
 
   <!-- -------- Avisos -------- -->
@@ -396,6 +479,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     </div>
 
     <div id="profesBox" class="hidden"></div>
+    <div id="staffBox" class="hidden"></div>
 
     <div id="cumpleBox"></div>
     <div class="exgroup-title">Avisos</div>
@@ -407,6 +491,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     <button class="tab" data-screen="Ranking"><span class="ic">🏆</span>Ranking</button>
     <button class="tab" data-screen="Carga"><span class="ic">➕</span>Cargar</button>
     <button class="tab" data-screen="Avisos"><span class="ic">🔔</span>Avisos<span id="avBadge" class="hidden"></span></button>
+    <button class="tab" data-screen="Revisar" id="tabRevisar" style="display:none;"><span class="ic">🗂</span>Revisar</button>
   </nav>
 </div>
 

@@ -25,8 +25,15 @@ var EJERCICIOS_FUERZA_CARGA = ['SENTADILLA', 'SENTADILLA MEDIA', 'PESO MUERTO', 
 // Campo: tiene que ser EXACTAMENTE la misma lista que RANKING_CAMPO en el backend.
 var EJERCICIOS_CAMPO = ['BRONCO', 'VEL MAX'];
 // Unidad para mostrar cada ejercicio en Mis Datos y Ranking (todo lo que no está acá es 'kg').
-var UNIDAD_EJ = {'SALTO HORIZONTAL': 'm', 'BRONCO': 's', 'VEL MAX': 'km/h'};
-function unidadEj_(ej) { return UNIDAD_EJ[ej] || 'kg'; }
+var UNIDAD_EJ = {'SALTO HORIZONTAL': 'm', 'BRONCO': 's', 'VEL MAX': 'km/h', 'MINUTOS': 'min', 'PARTIDOS': ''};
+function unidadEj_(ej) { return ej in UNIDAD_EJ ? UNIDAD_EJ[ej] : 'kg'; }
+// Bronco se guarda en segundos (igual que siempre) pero se muestra en minutos:segundos, más
+// natural para leer que "308 s" -- en el resto de los ejercicios no cambia nada.
+function partesValor_(ej, v) {
+  if (ej === 'BRONCO') { var m = Math.floor(v / 60), s = Math.round(v % 60); return {num: m + ':' + (s < 10 ? '0' : '') + s, unidad: ''}; }
+  return {num: String(v), unidad: unidadEj_(ej)};
+}
+function formatearValor_(ej, v) { var p = partesValor_(ej, v); return p.unidad ? (p.num + ' ' + p.unidad) : p.num; }
 var CAMPO_ID = {
   'ARRANQUE': 'campoArranque', 'TIRÓN DE ARRANQUE': 'campoTironArranque', 'CARGADA': 'campoCargada',
   'TIRÓN DE CARGADA': 'campoTironCargada', 'SENTADILLA': 'campoSentadilla',
@@ -36,7 +43,7 @@ var CAMPO_ID = {
 // Nombres tal cual están en la base (no se tocan, serían decenas de miles de filas históricas)
 // vs. cómo se muestran en la app. Pedido de Mariano (30/10): Press Banca y Press Pecho son el
 // mismo ejercicio — se unifica mostrando siempre "Press de Pecho".
-var ETIQUETAS = {'PRESS BANCA': 'PRESS DE PECHO'};
+var ETIQUETAS = {'PRESS BANCA': 'PRESS DE PECHO', 'MINUTOS': 'MINUTOS JUGADOS', 'PARTIDOS': 'PARTIDOS JUGADOS'};
 function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 
 // Solo en la pantalla de Carga: lo que se anota como "Sentadilla" en la base es siempre
@@ -51,8 +58,9 @@ var ZONAS_LESION = ['Cabeza / conmoción', 'Cuello', 'Hombro', 'Brazo / codo', '
   'Pierna / gemelo', 'Tobillo', 'Pie', 'Otra'];
 var CAMADAS_COACH = ['M15', 'M16', 'M17', 'M19', 'PLANTEL', 'G2 PS'];
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false,
-  jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null};
+var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
+  jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null,
+  esStaff: false, staffCamadas: null, revisar: null, revisarCamada: 'TODAS', previewJugador: null, cargaTab: 'gym'};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -102,6 +110,10 @@ function datosDemoRanking_() {
   out['VEL MAX'] = {club: tv, camada: tv.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
   var tb = top(290, true, false);
   out.BRONCO = {club: tb, camada: tb.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
+  var tm = top(220, false, false);
+  out.MINUTOS = {club: tm, camada: tm.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
+  var tp = top(4, false, false);
+  out.PARTIDOS = {club: tp, camada: tp.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
   return {nombre: 'Jugador de ejemplo', camada: 'M17', ranking: out};
 }
 function datosDemoAvisos_() {
@@ -178,6 +190,7 @@ function backendGet_(action, params) {
   return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
     if (j.error == 'SIN_VINCULAR') {
       if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
+      if (j.esStaff) { entrarComoStaff_(); return Promise.reject('es-staff'); }
       mostrarSinVincular_(); return Promise.reject('sin-vincular');
     }
     if (j.error == 'PENDIENTE_APROBACION') { mostrarPendiente_(); return Promise.reject('pendiente'); }
@@ -214,16 +227,28 @@ function entrarComoCoach_() {
   document.getElementById('hCamada').textContent = 'Liceo Naval';
   document.querySelectorAll('.tab').forEach(function (t) {
     var pantalla = t.getAttribute('data-screen');
-    t.style.display = (pantalla == 'Avisos' || pantalla == 'Ranking') ? '' : 'none';
+    t.style.display = (pantalla == 'Avisos' || pantalla == 'Ranking' || pantalla == 'Revisar') ? '' : 'none';
   });
   irAPantalla_('Avisos');
   cargarAvisos_();
 }
 
+// Staff: solo ve Ranking (informe de partidos y lesiones de su camada, o todo el club), de solo
+// lectura -- no Avisos, no Carga, no Mis Datos, no Revisar.
+function entrarComoStaff_() {
+  state.esCoach = false; state.esStaff = true;
+  document.getElementById('hNombre').textContent = 'Staff';
+  document.getElementById('hCamada').textContent = 'Liceo Naval';
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.style.display = t.getAttribute('data-screen') == 'Ranking' ? '' : 'none';
+  });
+  irAPantalla_('Ranking');
+}
+
 function marcarDemo_(si) { document.getElementById('demoBanner').classList.toggle('hidden', !si); state.demo = si; }
 
 // Errores que ya muestran su propia pantalla (login) y no tienen que caer en modo demo.
-var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'no-autorizado', 'pendiente', 'rechazado'];
+var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'es-staff', 'no-autorizado', 'pendiente', 'rechazado'];
 
 function cargarMisDatos_() {
   backendGet_('misdatos').then(function (d) { marcarDemo_(false); state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
@@ -253,7 +278,7 @@ function fmtFecha_(iso) {
   return d.toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: '2-digit'});
 }
 
-function tarjetaEj_(nombre, d, unidad) {
+function tarjetaEj_(nombre, d) {
   var div = document.createElement('div'); div.className = 'excard';
   var nameDiv = document.createElement('div'); nameDiv.className = 'exname'; nameDiv.textContent = etiqueta_(nombre);
   div.appendChild(nameDiv);
@@ -264,9 +289,10 @@ function tarjetaEj_(nombre, d, unidad) {
   }
   var row = document.createElement('div'); row.className = 'exrow';
   var val = document.createElement('div'); val.className = 'exval';
-  val.innerHTML = d.actual + ' <small>' + unidad + '</small>';
+  var pa = partesValor_(nombre, d.actual);
+  val.innerHTML = pa.num + (pa.unidad ? ' <small>' + pa.unidad + '</small>' : '');
   var rec = document.createElement('div'); rec.className = 'exrecord';
-  rec.textContent = 'Récord ' + d.record + ' ' + unidad + ' · ' + fmtFecha_(d.fechaRecord);
+  rec.textContent = 'Récord ' + formatearValor_(nombre, d.record) + ' · ' + fmtFecha_(d.fechaRecord);
   row.appendChild(val); row.appendChild(rec);
   div.appendChild(row);
   return div;
@@ -284,37 +310,59 @@ function renderMisDatos_(d) {
   document.getElementById('statMinutos').textContent = d.partidos ? d.partidos.minutos : 0;
 
   var gp = document.getElementById('grupoPotencia'); gp.innerHTML = '';
-  EJERCICIOS_POTENCIA.forEach(function (e) { gp.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
+  EJERCICIOS_POTENCIA.forEach(function (e) { gp.appendChild(tarjetaEj_(e, d.ejercicios[e])); });
 
   var gf = document.getElementById('grupoFuerza'); gf.innerHTML = '';
-  EJERCICIOS_FUERZA.forEach(function (e) { gf.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
+  EJERCICIOS_FUERZA.forEach(function (e) { gf.appendChild(tarjetaEj_(e, d.ejercicios[e])); });
 
   var gs = document.getElementById('grupoSalto'); gs.innerHTML = '';
-  gs.appendChild(tarjetaEj_('SALTO HORIZONTAL', d.ejercicios['SALTO HORIZONTAL'], 'm'));
+  gs.appendChild(tarjetaEj_('SALTO HORIZONTAL', d.ejercicios['SALTO HORIZONTAL']));
 
   var gc = document.getElementById('grupoCampo'); gc.innerHTML = '';
-  EJERCICIOS_CAMPO.forEach(function (e) { gc.appendChild(tarjetaEj_(e, d.ejercicios[e], unidadEj_(e))); });
+  EJERCICIOS_CAMPO.forEach(function (e) { gc.appendChild(tarjetaEj_(e, d.ejercicios[e])); });
 }
 
 // ---------------------------------------------------------------------------
 // Render: Ranking
 // ---------------------------------------------------------------------------
+// 3 sub-pestañas, igual que en Los Matreros: fuerza (potencia+fuerza+salto), campo, partidos.
+var RANKING_GRUPOS = {
+  fuerza: EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']),
+  campo: EJERCICIOS_CAMPO,
+  partidos: ['MINUTOS', 'PARTIDOS']
+};
+var RANKING_GRUPO_NOMBRE = {fuerza: 'Ranking fuerza', campo: 'Ranking campo', partidos: 'Ranking partidos'};
+
+function renderRankGrupos_() {
+  var cont = document.getElementById('rankGrupos'); cont.innerHTML = '';
+  Object.keys(RANKING_GRUPOS).forEach(function (g) {
+    var b = document.createElement('button'); b.className = 'pill' + (g == state.rankingGrupo ? ' active' : '');
+    b.textContent = RANKING_GRUPO_NOMBRE[g];
+    b.onclick = function () {
+      state.rankingGrupo = g;
+      if (RANKING_GRUPOS[g].indexOf(state.rankingEj) < 0) state.rankingEj = RANKING_GRUPOS[g][0];
+      renderRanking_();
+    };
+    cont.appendChild(b);
+  });
+}
+
 function renderRankChips_() {
   var cont = document.getElementById('rankChips'); cont.innerHTML = '';
-  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).concat(EJERCICIOS_CAMPO).forEach(function (e) {
+  RANKING_GRUPOS[state.rankingGrupo].forEach(function (e) {
     var b = document.createElement('button'); b.className = 'chip' + (e == state.rankingEj ? ' active' : '');
     b.textContent = etiqueta_(e); b.onclick = function () { state.rankingEj = e; renderRanking_(); };
     cont.appendChild(b);
   });
 }
 
-function tablaRanking_(lista, mePuesto, soyNombre, unidad) {
+function tablaRanking_(lista, mePuesto, soyNombre, ej) {
   var div = document.createElement('div');
   lista.forEach(function (r, i) {
     var row = document.createElement('div'); row.className = 'rankrow' + (i == 0 ? ' top1' : '') + (r.nombre == soyNombre ? ' me' : '');
     var pos = document.createElement('div'); pos.className = 'pos'; pos.textContent = (i + 1) + '°';
     var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.nombre;
-    var vv = document.createElement('div'); vv.className = 'vv'; vv.textContent = r.v + ' ' + unidad;
+    var vv = document.createElement('div'); vv.className = 'vv'; vv.textContent = formatearValor_(ej, r.v);
     var rr = document.createElement('div'); rr.className = 'rr'; rr.textContent = r.rel ? r.rel.toFixed(2) + 'x' : '';
     row.appendChild(pos); row.appendChild(nm); row.appendChild(vv); row.appendChild(rr);
     div.appendChild(row);
@@ -323,16 +371,17 @@ function tablaRanking_(lista, mePuesto, soyNombre, unidad) {
 }
 
 function renderRanking_() {
+  renderRankGrupos_();
   renderRankChips_();
   if (!state.ranking) return;
   var r = state.ranking.ranking[state.rankingEj];
-  var unidad = unidadEj_(state.rankingEj);
+  if (!r) return;
   var nm = state.ranking.nombre;
 
-  var cc = document.getElementById('rankCamada'); cc.innerHTML = ''; cc.appendChild(tablaRanking_(r.camada, r.miPuestoCamada, nm, unidad));
+  var cc = document.getElementById('rankCamada'); cc.innerHTML = ''; cc.appendChild(tablaRanking_(r.camada, r.miPuestoCamada, nm, state.rankingEj));
   document.getElementById('miPosCamada').textContent = r.miPuestoCamada ? 'Tu puesto en la camada: ' + r.miPuestoCamada + '°' : 'Todavía no tenés cargas de este ejercicio';
 
-  var cl = document.getElementById('rankClub'); cl.innerHTML = ''; cl.appendChild(tablaRanking_(r.club, r.miPuestoClub, nm, unidad));
+  var cl = document.getElementById('rankClub'); cl.innerHTML = ''; cl.appendChild(tablaRanking_(r.club, r.miPuestoClub, nm, state.rankingEj));
   document.getElementById('miPosClub').textContent = r.miPuestoClub ? 'Tu puesto en el club: ' + r.miPuestoClub + '°' : 'Todavía no tenés cargas de este ejercicio';
 }
 
@@ -341,8 +390,12 @@ function renderRanking_() {
 // ---------------------------------------------------------------------------
 function renderCoachPartidos_() {
   var d = state.coachPartidos; if (!d) return;
+  state.coachCamada = d.camada;   // el backend puede haber corregido la camada pedida (fuera de permiso, etc.)
   var sel = document.getElementById('coachCamada');
-  if (sel.value !== state.coachCamada) sel.value = state.coachCamada;
+  Array.from(sel.options).forEach(function (o) { o.hidden = o.value != 'TODAS' && d.camadas.indexOf(o.value) < 0; });
+  var optTodas = sel.querySelector('option[value="TODAS"]');
+  if (optTodas) optTodas.hidden = d.camadas.length <= 1;
+  if (sel.value != d.camada) sel.value = d.camada;
 
   var faltanBox = document.getElementById('coachFaltanBox'); faltanBox.innerHTML = '';
   if (d.faltan && d.faltan.length) {
@@ -391,6 +444,150 @@ function renderCoachPartidos_() {
 }
 
 // ---------------------------------------------------------------------------
+// Informe de partidos + lesiones: imprimir, enviar por mail, descargar Excel.
+// Combinado (no separado por vista) para simplificar -- como tiene datos de lesiones, el backend
+// igual restringe el envío por mail a PFs/a mí (ver VISTAS_SENSIBLES en apps_script_base_liceo.gs).
+// ---------------------------------------------------------------------------
+function textoInformeLesiones_() {
+  var d = state.coachPartidos;
+  var titulo = 'Informe de partidos y lesiones — ' + (!d || d.camada == 'TODAS' ? 'Todo el club' : d.camada);
+  if (!d) return {titulo: titulo, texto: '', filas: [[titulo]]};
+  var lineas = [titulo, '', 'INFORME DE PARTIDOS'];
+  var filas = [[titulo], [], ['INFORME DE PARTIDOS'], ['JUGADOR', 'CAMADA', 'PARTIDOS', 'MINUTOS', 'PROMEDIO', 'LESIONES']];
+  (d.informe || []).forEach(function (r) {
+    lineas.push(r.nombre + ' (' + r.camada + '): ' + r.partidos + ' partidos, ' + r.minutos + ' min, prom ' + r.promedio + (r.lesiones ? ', ' + r.lesiones + ' lesión/es' : ''));
+    filas.push([r.nombre, r.camada, r.partidos, r.minutos, r.promedio, r.lesiones]);
+  });
+  if (d.lesiones && d.lesiones.total) {
+    lineas.push('', 'LESIONES (' + d.lesiones.total + ')');
+    lineas.push('Por zona: ' + d.lesiones.porZona.map(function (x) { return x.clave + ' (' + x.n + ')'; }).join(', '));
+    lineas.push('Por momento: ' + d.lesiones.porMomento.map(function (x) { return x.clave + ' (' + x.n + ')'; }).join(', '));
+    filas.push([], ['LESIONES'], ['FECHA', 'JUGADOR', 'CAMADA', 'EQUIPO', 'MOMENTO', 'ZONA', 'DETALLE']);
+    d.lesiones.lista.forEach(function (p) {
+      lineas.push(fmtFecha_(p.fecha) + ' · ' + p.nombre + ' · ' + p.equipo + ' · ' + p.zona + (p.detalle ? ' — ' + p.detalle : ''));
+      filas.push([fmtFecha_(p.fecha), p.nombre, p.camada, p.equipo, p.lesion, p.zona, p.detalle]);
+    });
+  }
+  return {titulo: titulo, texto: lineas.join('\n'), filas: filas};
+}
+
+function descargarExcel_() {
+  var ex = textoInformeLesiones_();
+  var csv = ex.filas.map(function (fila) {
+    return fila.map(function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(',');
+  }).join('\r\n');
+  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = ex.titulo.replace(/[^a-z0-9áéíóúñ]+/gi, '_') + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function enviarInformePorMail_() {
+  var msg = document.getElementById('mailMsg');
+  var ex = textoInformeLesiones_();
+  var destino = document.getElementById('mailDestino').value;
+  var jugador = document.getElementById('mailJugador').value.trim();
+  if (destino == 'JUGADOR' && !jugador) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí el nombre del jugador.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad.'; return; }
+  var btn = document.getElementById('mailEnviarBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'enviarInforme', vista: 'INFORME', destino: destino,
+      camada: state.coachCamada, equipo: (state.coachPartidos && state.coachPartidos.equipo) || '', jugador: jugador,
+      titulo: ex.titulo, texto: ex.texto})})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      btn.disabled = false;
+      if (j.error == 'No autorizado') { sesionVencida_(); return; }
+      if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
+      msg.style.color = 'var(--green)'; msg.textContent = '¡Enviado a ' + j.enviados + '!';
+    })
+    .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+}
+
+// ---------------------------------------------------------------------------
+// 👁 Ver como jugador (solo coach): vista previa de sus datos reales, de solo lectura.
+// ---------------------------------------------------------------------------
+function abrirVerComoJugador_() {
+  var box = document.getElementById('previewJugadorBox');
+  if (!box.classList.contains('hidden') && box.getAttribute('data-modo') == 'buscar') { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.setAttribute('data-modo', 'buscar');
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="fitem"><label>Nombre del jugador (de tu camada)</label><input type="text" id="previewInput" placeholder="Ej. Pérez Juan" autocomplete="off"></div>' +
+    '<button id="previewBuscarBtn" class="btn-outline" style="margin-bottom:14px;">Ver</button>';
+  document.getElementById('previewBuscarBtn').onclick = function () {
+    var nombre = document.getElementById('previewInput').value.trim();
+    if (!nombre) return;
+    Promise.all([backendGet_('misdatosDe', {jugador: nombre}), backendGet_('rankingDe', {jugador: nombre})])
+      .then(function (res) { renderPreviewJugador_(nombre, res[0]); })
+      .catch(function (err) {
+        if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return;
+        box.innerHTML = '<div class="exempty" style="color:var(--red);">No encontré a "' + nombre + '" en tu camada.</div>';
+      });
+  };
+}
+
+function renderPreviewJugador_(nombre, md) {
+  var box = document.getElementById('previewJugadorBox');
+  box.setAttribute('data-modo', 'resultado');
+  var ejTxt = Object.keys(md.ejercicios || {}).map(function (e) {
+    var d = md.ejercicios[e];
+    return etiqueta_(e) + ': ' + formatearValor_(e, d.actual) + ' (récord ' + formatearValor_(e, d.record) + ')';
+  }).join(' · ');
+  box.innerHTML = '<div class="excard"><div class="exname">👁 Viendo como: ' + nombre + '</div>' +
+    '<div class="lastmark" style="margin-top:8px;">' + (ejTxt || 'Sin cargas todavía') + '</div>' +
+    '<div class="lastmark">Partidos: ' + (md.partidos ? md.partidos.partidos + ' · ' + md.partidos.minutos + ' min' : '—') + '</div>' +
+    '<button id="previewCerrarBtn" class="btn2" style="margin-top:10px;">Cerrar</button></div>';
+  document.getElementById('previewCerrarBtn').onclick = function () { box.classList.add('hidden'); box.innerHTML = ''; };
+}
+
+// ---------------------------------------------------------------------------
+// 🗂 Revisar (solo coach): últimas cargas de su camada, con opción de borrar.
+// ---------------------------------------------------------------------------
+function cargarRevisar_() {
+  backendGet_('revisar', {camada: state.revisarCamada}).then(function (d) { marcarDemo_(false); state.revisar = d; renderRevisar_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; });
+}
+
+function renderRevisar_() {
+  var d = state.revisar;
+  var sel = document.getElementById('revisarCamada');
+  if (d) {
+    state.revisarCamada = d.camada;
+    Array.from(sel.options).forEach(function (o) { o.hidden = o.value != 'TODAS' && d.camadas.indexOf(o.value) < 0; });
+    if (sel.value != d.camada) sel.value = d.camada;
+  }
+  var list = document.getElementById('revisarList'); list.innerHTML = '';
+  if (!d || !d.registros || !d.registros.length) { list.innerHTML = '<div class="exempty">Sin cargas para revisar.</div>'; return; }
+  d.registros.forEach(function (r) {
+    var div = document.createElement('div'); div.className = 'avisocard';
+    var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = fmtFecha_(r.fecha) + ' · ' + r.nombre + ' · ' + r.camada;
+    var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = r.titulo + ': ' + r.texto;
+    var btn = document.createElement('button'); btn.textContent = 'Borrar';
+    btn.style.cssText = 'margin-top:8px;background:none;border:1px solid var(--red);color:var(--red);font-weight:700;font-family:var(--sans);font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;';
+    btn.onclick = function () {
+      if (btn.textContent == 'Borrar') { btn.textContent = '¿Seguro?'; return; }
+      btn.disabled = true; btn.textContent = 'Borrando…';
+      borrarCarga_(r.hoja, r.id);
+    };
+    div.appendChild(meta); div.appendChild(texto); div.appendChild(btn);
+    list.appendChild(div);
+  });
+}
+
+function borrarCarga_(hoja, id) {
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'borrarCarga', hoja: hoja, id: id})})
+    .then(function (r) { return r.json(); })
+    .then(function () { cargarRevisar_(); })
+    .catch(function () { cargarRevisar_(); });
+}
+
+// ---------------------------------------------------------------------------
 // Render: Avisos
 // ---------------------------------------------------------------------------
 function fmtFechaHora_(iso) {
@@ -422,25 +619,38 @@ function renderSolicitudes_() {
     var div = document.createElement('div'); div.className = 'avisocard unread';
     var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = (s.camada || 'sin camada') + ' · ' + (s.puesto || 'sin puesto');
     var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = s.nombre + ' — ' + s.email;
+    div.appendChild(meta); div.appendChild(texto);
+    // PLANTEL/G2 PS se corrigen acá (mismo "Superior" del form ambiguo entre las dos) -- M15..M19
+    // no se puede, es la fecha de nacimiento la que decide esa camada, no algo elegible a mano.
+    var selMayores = null;
+    if (s.camada == 'PLANTEL' || s.camada == 'G2 PS') {
+      selMayores = document.createElement('select');
+      selMayores.style.cssText = 'width:100%;font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:9px;margin-top:8px;';
+      ['PLANTEL', 'G2 PS'].forEach(function (c) {
+        var o = document.createElement('option'); o.value = c; o.textContent = c; if (c == s.camada) o.selected = true;
+        selMayores.appendChild(o);
+      });
+      div.appendChild(selMayores);
+    }
     var botones = document.createElement('div'); botones.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
     var ok = document.createElement('button'); ok.textContent = 'Aprobar';
     ok.style.cssText = 'flex:1;background:var(--green);border:none;color:#06222e;font-weight:800;font-family:var(--sans);font-size:13px;padding:9px;border-radius:9px;cursor:pointer;';
-    ok.onclick = function () { resolverSolicitud_(s.email, true, s.nombre); };
+    ok.onclick = function () { resolverSolicitud_(s.email, true, s.nombre, selMayores ? selMayores.value : null); };
     var no = document.createElement('button'); no.textContent = 'Rechazar';
     no.style.cssText = 'flex:1;background:var(--panel2);border:1px solid var(--border2);color:var(--text-mid);font-weight:700;font-family:var(--sans);font-size:13px;padding:9px;border-radius:9px;cursor:pointer;';
-    no.onclick = function () { resolverSolicitud_(s.email, false, s.nombre); };
+    no.onclick = function () { resolverSolicitud_(s.email, false, s.nombre, null); };
     botones.appendChild(ok); botones.appendChild(no);
-    div.appendChild(meta); div.appendChild(texto); div.appendChild(botones);
+    div.appendChild(botones);
     box.appendChild(div);
   });
 }
 
-function resolverSolicitud_(email, aprobar, nombre) {
+function resolverSolicitud_(email, aprobar, nombre, mayores) {
   if (!configLista_()) return;
   var msg = document.getElementById('solicitudMsg');
   msg.style.color = 'var(--text-dim)'; msg.textContent = (aprobar ? 'Aprobando' : 'Rechazando') + ' a ' + nombre + '…';
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify({token: state.token, action: 'resolverSolicitud', email: email, aprobar: aprobar})})
+    body: JSON.stringify({token: state.token, action: 'resolverSolicitud', email: email, aprobar: aprobar, mayores: mayores})})
     .then(function (r) { return r.json(); })
     .then(function (j) {
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
@@ -466,27 +676,27 @@ function ajustarComposeBoxCargo_(camadasCargo) {
 // ---------------------------------------------------------------------------
 // ⚙️ Profes: solo jefes (COACH_EMAILS) ven y tocan esto.
 // ---------------------------------------------------------------------------
-function renderProfes_() {
-  var box = document.getElementById('profesBox');
-  var profes = state.avisos && state.avisos.profes;
-  box.classList.toggle('hidden', !profes);
+// Genérico: ⚙️ Profes y ⚙️ Staff son el mismo patrón (lista por camada, agregar/sacar mail).
+function renderGrupoEmails_(contId, titulo, lista, accion) {
+  var box = document.getElementById(contId);
+  box.classList.toggle('hidden', !lista);
   box.innerHTML = '';
-  if (!profes) return;
-  var t = document.createElement('div'); t.className = 'exgroup-title'; t.textContent = '⚙️ Profes';
+  if (!lista) return;
+  var t = document.createElement('div'); t.className = 'exgroup-title'; t.textContent = titulo;
   box.appendChild(t);
-  profes.forEach(function (p) {
+  lista.forEach(function (p) {
     var div = document.createElement('div'); div.className = 'excard';
     var name = document.createElement('div'); name.className = 'exname'; name.textContent = p.camada;
     div.appendChild(name);
     var list = document.createElement('div'); list.style.marginTop = '8px';
-    if (!p.emails.length) { var vac = document.createElement('div'); vac.className = 'exempty'; vac.textContent = 'Sin profes asignados.'; list.appendChild(vac); }
+    if (!p.emails.length) { var vac = document.createElement('div'); vac.className = 'exempty'; vac.textContent = 'Sin nadie asignado.'; list.appendChild(vac); }
     p.emails.forEach(function (m) {
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;font-family:var(--mono);font-size:12px;';
       var txt = document.createElement('span'); txt.style.flex = '1'; txt.textContent = m;
       var x = document.createElement('button'); x.textContent = '✕';
       x.style.cssText = 'background:none;border:1px solid var(--border2);color:var(--red);border-radius:8px;width:26px;height:26px;cursor:pointer;flex-shrink:0;';
-      x.onclick = function () { guardarProfesCamada_(p.camada, p.emails.filter(function (e) { return e != m; })); };
+      x.onclick = function () { guardarGrupoEmails_(accion, p.camada, p.emails.filter(function (e) { return e != m; })); };
       row.appendChild(txt); row.appendChild(x);
       list.appendChild(row);
     });
@@ -498,7 +708,7 @@ function renderProfes_() {
     add.style.cssText = 'background:var(--accent);border:none;color:#06222e;font-weight:700;font-family:var(--sans);font-size:12px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0;';
     add.onclick = function () {
       var m = inp.value.trim().toLowerCase(); if (!m) return;
-      guardarProfesCamada_(p.camada, p.emails.concat([m]).filter(function (e, i, arr) { return arr.indexOf(e) == i; }));
+      guardarGrupoEmails_(accion, p.camada, p.emails.concat([m]).filter(function (e, i, arr) { return arr.indexOf(e) == i; }));
     };
     addRow.appendChild(inp); addRow.appendChild(add);
     div.appendChild(addRow);
@@ -506,14 +716,17 @@ function renderProfes_() {
   });
 }
 
-function guardarProfesCamada_(camada, mails) {
+function guardarGrupoEmails_(accion, camada, mails) {
   if (!configLista_()) return;
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify({token: state.token, action: 'guardarProfes', camada: camada, mails: mails})})
+    body: JSON.stringify({token: state.token, action: accion, camada: camada, mails: mails})})
     .then(function (r) { return r.json(); })
     .then(function (j) { if (!j.error) cargarAvisos_(); })
     .catch(function () {});
 }
+
+function renderProfes_() { renderGrupoEmails_('profesBox', '⚙️ Profes', state.avisos && state.avisos.profes, 'guardarProfes'); }
+function renderStaff_() { renderGrupoEmails_('staffBox', '⚙️ Staff', state.avisos && state.avisos.staff, 'guardarStaff'); }
 
 function renderAvisos_() {
   var d = state.avisos; if (!d) return;
@@ -524,6 +737,7 @@ function renderAvisos_() {
   cargoLine.textContent = d.cargo || '';
   renderSolicitudes_();
   renderProfes_();
+  renderStaff_();
   if (d.esCoach) ajustarComposeBoxCargo_(d.camadasCargo);
 
   var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
@@ -640,6 +854,19 @@ function campoRM_(nombre) {
   return wrap;
 }
 
+function cambiarCargaTab_(tab) {
+  state.cargaTab = tab;
+  document.querySelectorAll('#cargaPills .pill').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-carga') == tab); });
+  document.getElementById('cargaGymPanel').classList.toggle('hidden', tab != 'gym');
+  document.getElementById('cargaCampoPanel').classList.toggle('hidden', tab != 'campo');
+  document.getElementById('cargaPartidoPanel').classList.toggle('hidden', tab != 'partido');
+  document.getElementById('cargaCierre').classList.toggle('hidden', tab == 'partido');
+  document.getElementById('submitBtn').classList.toggle('hidden', tab == 'partido');
+  document.getElementById('cargaMsg').classList.toggle('hidden', tab == 'partido');
+  document.getElementById('cFechaWrap').classList.toggle('hidden', tab == 'partido');
+  document.getElementById('submitBtn').textContent = tab == 'campo' ? 'Cargar sesión de campo' : 'Cargar sesión de gym';
+}
+
 function pintarCamposCarga_() {
   EJERCICIOS_POTENCIA_CARGA.concat(EJERCICIOS_FUERZA_CARGA).forEach(function (e) {
     var cont = document.getElementById(CAMPO_ID[e]); if (!cont) return;
@@ -648,7 +875,7 @@ function pintarCamposCarga_() {
   var saltoInfo = state.misDatos && state.misDatos.ejercicios['SALTO HORIZONTAL'];
   document.getElementById('lastSalto').textContent = saltoInfo ? 'Última: ' + saltoInfo.actual + ' m' : '';
   var broncoInfo = state.misDatos && state.misDatos.ejercicios['BRONCO'];
-  document.getElementById('lastBronco').textContent = broncoInfo ? 'Última: ' + broncoInfo.actual + ' s' : '';
+  document.getElementById('lastBronco').textContent = broncoInfo ? 'Última: ' + formatearValor_('BRONCO', broncoInfo.actual) : '';
   var velMaxInfo = state.misDatos && state.misDatos.ejercicios['VEL MAX'];
   document.getElementById('lastVelMax').textContent = velMaxInfo ? 'Última: ' + velMaxInfo.actual + ' km/h' : '';
   var pesoInfo = state.misDatos && state.misDatos.pesoActual;
@@ -656,6 +883,7 @@ function pintarCamposCarga_() {
   var alturaInfo = state.misDatos && state.misDatos.alturaActual;
   document.getElementById('lastAltura').textContent = alturaInfo != null ? 'Última: ' + alturaInfo + ' cm' : '';
   document.getElementById('cFecha').value = new Date().toISOString().slice(0, 10);
+  cambiarCargaTab_(state.cargaTab || 'gym');
   pintarCamposPartido_();
 }
 
@@ -686,13 +914,17 @@ function recolectarEjercicios_() {
 
 function enviarCarga_() {
   var msg = document.getElementById('cargaMsg');
-  var ejercicios = recolectarEjercicios_();
-  var salto = document.getElementById('cSalto').value;
-  if (salto) ejercicios.push({nombre: 'SALTO HORIZONTAL', valor: salto});
-  var bronco = document.getElementById('cBronco').value;
-  if (bronco) ejercicios.push({nombre: 'BRONCO', valor: bronco});
-  var velMax = document.getElementById('cVelMax').value;
-  if (velMax) ejercicios.push({nombre: 'VEL MAX', valor: velMax});
+  var ejercicios = [];
+  if (state.cargaTab == 'campo') {
+    var min = document.getElementById('cBroncoMin').value, seg = document.getElementById('cBroncoSeg').value;
+    if (min || seg) ejercicios.push({nombre: 'BRONCO', valor: String((Number(min) || 0) * 60 + (Number(seg) || 0))});
+    var velMax = document.getElementById('cVelMax').value;
+    if (velMax) ejercicios.push({nombre: 'VEL MAX', valor: velMax});
+  } else {
+    ejercicios = recolectarEjercicios_();
+    var salto = document.getElementById('cSalto').value;
+    if (salto) ejercicios.push({nombre: 'SALTO HORIZONTAL', valor: salto});
+  }
   var body = {
     token: state.token, fecha: document.getElementById('cFecha').value,
     pesoCorporal: document.getElementById('cPeso').value, altura: document.getElementById('cAltura').value,
@@ -759,13 +991,19 @@ function irAPantalla_(nombre) {
   document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-screen') == nombre); });
   document.getElementById('screen' + nombre).classList.add('active');
   if (nombre == 'Ranking') {
-    document.getElementById('coachPartidosBox').classList.toggle('hidden', !state.esCoach);
-    document.getElementById('miRankingBox').classList.toggle('hidden', state.esCoach && !state.misDatos);
-    if (state.esCoach) cargarRankingCoach_();
+    var esStaffOCoach = state.esCoach || state.esStaff;
+    document.getElementById('coachPartidosBox').classList.toggle('hidden', !esStaffOCoach);
+    document.getElementById('miRankingBox').classList.toggle('hidden', esStaffOCoach && !state.misDatos);
+    document.getElementById('verComoJugadorBtn').classList.toggle('hidden', !state.esCoach);   // staff no "ve como jugador"
+    document.getElementById('coachExportBox').classList.toggle('hidden', !esStaffOCoach);
+    document.getElementById('excelBtn').classList.toggle('hidden', !state.esCoach);   // staff: solo imprimir, no excel ni mail
+    document.getElementById('mailBtn').classList.toggle('hidden', !state.esCoach);
+    if (esStaffOCoach) cargarRankingCoach_();
     if (state.misDatos && !state.ranking) cargarRanking_();
   }
   if (nombre == 'Carga') pintarCamposCarga_();
   if (nombre == 'Avisos') { cargarAvisos_(); marcarAvisosVistos_(); document.getElementById('avBadge').classList.add('hidden'); }
+  if (nombre == 'Revisar') cargarRevisar_();
 }
 
 // ---------------------------------------------------------------------------
@@ -794,6 +1032,16 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('pZonaWrap').classList.toggle('hidden', !hayLesion);
     document.getElementById('pDetalleWrap').classList.toggle('hidden', !hayLesion);
   };
+  document.querySelectorAll('#cargaPills .pill').forEach(function (b) { b.onclick = function () { cambiarCargaTab_(b.getAttribute('data-carga')); }; });
+  document.getElementById('revisarCamada').onchange = function (e) { state.revisarCamada = e.target.value; cargarRevisar_(); };
+  document.getElementById('verComoJugadorBtn').onclick = abrirVerComoJugador_;
+  document.getElementById('mailBtn').onclick = function () { document.getElementById('mailBox').classList.toggle('hidden'); };
+  document.getElementById('mailDestino').onchange = function (e) {
+    document.getElementById('mailJugadorWrap').classList.toggle('hidden', e.target.value != 'JUGADOR');
+  };
+  document.getElementById('mailEnviarBtn').onclick = enviarInformePorMail_;
+  document.getElementById('imprimirBtn').onclick = function () { window.print(); };
+  document.getElementById('excelBtn').onclick = descargarExcel_;
 
   var token = null;
   try { token = localStorage.getItem('liceo_token'); } catch (e) {}
