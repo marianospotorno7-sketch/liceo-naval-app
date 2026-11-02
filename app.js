@@ -450,10 +450,81 @@ function resolverSolicitud_(email, aprobar, nombre) {
     .catch(function () { msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }
 
+// Un profe de camada no puede mandar avisos a "Todos" ni elegir otra camada que la suya --
+// se achica el desplegable "Para" y las opciones de camada a lo que le corresponde.
+function ajustarComposeBoxCargo_(camadasCargo) {
+  var selTipo = document.getElementById('avDestinoTipo');
+  var optTodos = selTipo.querySelector('option[value="TODOS"]');
+  if (optTodos) { optTodos.hidden = !!camadasCargo; optTodos.disabled = !!camadasCargo; }
+  if (camadasCargo && selTipo.value == 'TODOS') selTipo.value = 'CAMADA';
+  var selCamada = document.getElementById('avCamada');
+  Array.from(selCamada.options).forEach(function (o) { o.hidden = !!camadasCargo && camadasCargo.indexOf(o.value) < 0; });
+  if (camadasCargo && camadasCargo.indexOf(selCamada.value) < 0) selCamada.value = camadasCargo[0];
+  document.getElementById('avDestinoTipo').dispatchEvent(new Event('change'));
+}
+
+// ---------------------------------------------------------------------------
+// ⚙️ Profes: solo jefes (COACH_EMAILS) ven y tocan esto.
+// ---------------------------------------------------------------------------
+function renderProfes_() {
+  var box = document.getElementById('profesBox');
+  var profes = state.avisos && state.avisos.profes;
+  box.classList.toggle('hidden', !profes);
+  box.innerHTML = '';
+  if (!profes) return;
+  var t = document.createElement('div'); t.className = 'exgroup-title'; t.textContent = '⚙️ Profes';
+  box.appendChild(t);
+  profes.forEach(function (p) {
+    var div = document.createElement('div'); div.className = 'excard';
+    var name = document.createElement('div'); name.className = 'exname'; name.textContent = p.camada;
+    div.appendChild(name);
+    var list = document.createElement('div'); list.style.marginTop = '8px';
+    if (!p.emails.length) { var vac = document.createElement('div'); vac.className = 'exempty'; vac.textContent = 'Sin profes asignados.'; list.appendChild(vac); }
+    p.emails.forEach(function (m) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;font-family:var(--mono);font-size:12px;';
+      var txt = document.createElement('span'); txt.style.flex = '1'; txt.textContent = m;
+      var x = document.createElement('button'); x.textContent = '✕';
+      x.style.cssText = 'background:none;border:1px solid var(--border2);color:var(--red);border-radius:8px;width:26px;height:26px;cursor:pointer;flex-shrink:0;';
+      x.onclick = function () { guardarProfesCamada_(p.camada, p.emails.filter(function (e) { return e != m; })); };
+      row.appendChild(txt); row.appendChild(x);
+      list.appendChild(row);
+    });
+    div.appendChild(list);
+    var addRow = document.createElement('div'); addRow.className = 'exrow2'; addRow.style.marginTop = '8px';
+    var inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'mail@gmail.com';
+    inp.style.cssText = 'flex:1;font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:9px;';
+    var add = document.createElement('button'); add.textContent = 'Agregar';
+    add.style.cssText = 'background:var(--accent);border:none;color:#06222e;font-weight:700;font-family:var(--sans);font-size:12px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0;';
+    add.onclick = function () {
+      var m = inp.value.trim().toLowerCase(); if (!m) return;
+      guardarProfesCamada_(p.camada, p.emails.concat([m]).filter(function (e, i, arr) { return arr.indexOf(e) == i; }));
+    };
+    addRow.appendChild(inp); addRow.appendChild(add);
+    div.appendChild(addRow);
+    box.appendChild(div);
+  });
+}
+
+function guardarProfesCamada_(camada, mails) {
+  if (!configLista_()) return;
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'guardarProfes', camada: camada, mails: mails})})
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (!j.error) cargarAvisos_(); })
+    .catch(function () {});
+}
+
 function renderAvisos_() {
   var d = state.avisos; if (!d) return;
+  state.camadasCargo = d.camadasCargo || null;
   document.getElementById('composeBox').classList.toggle('hidden', !d.esCoach);
+  var cargoLine = document.getElementById('cargoLine');
+  cargoLine.classList.toggle('hidden', !d.cargo);
+  cargoLine.textContent = d.cargo || '';
   renderSolicitudes_();
+  renderProfes_();
+  if (d.esCoach) ajustarComposeBoxCargo_(d.camadasCargo);
 
   var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
   (d.cumpleanos || []).forEach(function (c) {

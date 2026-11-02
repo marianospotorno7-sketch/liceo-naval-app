@@ -150,6 +150,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 #avEnviarBtn{width:100%;background:var(--accent);border:none;color:#06222e;font-weight:800;font-family:var(--sans);
   font-size:14px;padding:12px;border-radius:12px;cursor:pointer;margin-top:4px;box-shadow:0 6px 20px -6px var(--accent-dim);}
 .tab{position:relative;}
+#cargoLine{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;}
 #avBadge{position:absolute;top:2px;right:16px;background:var(--red);color:#fff;font-size:9px;font-weight:800;
   min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
 .cumplecard{background:var(--gold-dim);border:1px solid var(--gold);border-radius:12px;padding:12px 15px;margin-bottom:9px;
@@ -362,6 +363,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 
   <!-- -------- Avisos -------- -->
   <section class="screen" id="screenAvisos">
+    <div id="cargoLine" class="hidden"></div>
     <div id="solicitudesBox" class="hidden"></div>
     <div id="composeBox" class="hidden">
       <div class="exgroup-title">Escribir un aviso</div>
@@ -392,6 +394,8 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
       <button id="avEnviarBtn">Enviar aviso</button>
       <div id="avMsg" style="text-align:center;font-family:var(--mono);font-size:12px;margin:8px 0 18px;"></div>
     </div>
+
+    <div id="profesBox" class="hidden"></div>
 
     <div id="cumpleBox"></div>
     <div class="exgroup-title">Avisos</div>
