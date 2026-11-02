@@ -110,7 +110,11 @@ function sesionVencida_() {
 function entrarAlApp_() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
+  // Mis Datos y Avisos no dependen uno del otro -- se pedían encadenados (uno esperaba al otro)
+  // y eso duplicaba el tiempo de apertura. Van en paralelo (pedido de Mariano, 2/11: "que cargue
+  // más rápido").
   cargarMisDatos_();
+  cargarAvisos_();
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +186,7 @@ function entrarComoStaff_() {
 var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'es-staff', 'no-autorizado', 'pendiente', 'rechazado'];
 
 function cargarMisDatos_() {
-  backendGet_('misdatos').then(function (d) { state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
+  backendGet_('misdatos').then(function (d) { state.esCoach = !!d.esCoach; renderMisDatos_(d); })
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('misdatos', err); });
 }
 
@@ -877,7 +881,7 @@ function enviarCarga_() {
       if (j.error == 'No autorizado') { sesionVencida_(); return; }
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Cargado! (' + j.cargados + ' registros)';
-      cargarMisDatos_();
+      cargarMisDatos_(); cargarAvisos_();   // la carga puede generar avisos automáticos (récord, cambio brusco)
     })
     .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }
@@ -909,7 +913,7 @@ function enviarPartido_() {
       document.getElementById('pMinutos').value = ''; document.getElementById('pDetalle').value = '';
       document.getElementById('pLesion').value = 'NO';
       document.getElementById('pZonaWrap').classList.add('hidden'); document.getElementById('pDetalleWrap').classList.add('hidden');
-      cargarMisDatos_();
+      cargarMisDatos_(); cargarAvisos_();
     })
     .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }

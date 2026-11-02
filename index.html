@@ -13,6 +13,10 @@
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<!-- Preconnect al backend (Apps Script): el navegador arranca el handshake HTTPS mientras
+     todavía está parseando la página, para que el primer pedido real (login, Mis Datos) no
+     tenga que esperar esa conexión desde cero. -->
+<link rel="preconnect" href="https://script.google.com" crossorigin="">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=JetBrains+Mono:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
