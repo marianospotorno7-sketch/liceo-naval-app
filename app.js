@@ -58,75 +58,12 @@ var ZONAS_LESION = ['Cabeza / conmoción', 'Cuello', 'Hombro', 'Brazo / codo', '
   'Pierna / gemelo', 'Tobillo', 'Pie', 'Otra'];
 var CAMADAS_COACH = ['M15', 'M16', 'M17', 'M19', 'PLANTEL', 'G2 PS'];
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
+var state = {token: null, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
   jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null,
   esStaff: false, staffCamadas: null, revisar: null, revisarCamada: 'TODAS', previewJugador: null, cargaTab: 'gym'};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
-}
-
-// ---------------------------------------------------------------------------
-// Datos de ejemplo — se usan solo si el backend todavía no está configurado,
-// o si la llamada real falla, para poder ver y probar la interfaz mientras tanto.
-// ---------------------------------------------------------------------------
-function datosDemoMisDatos_() {
-  var hoy = new Date();
-  function serie(base, paso) {
-    return [-60, -40, -20, -5].map(function (d, i) {
-      var f = new Date(hoy); f.setDate(f.getDate() + d);
-      return {fecha: f.toISOString(), valor: Math.round((base + i * paso) * 100) / 100};
-    });
-  }
-  var ej = {};
-  [['ARRANQUE', 55, 2.5], ['CARGADA', 70, 2.5], ['SENTADILLA', 110, 2.5], ['PESO MUERTO', 140, 2.5], ['DESPEGUE', 90, 2.5],
-   ['PRESS BANCA', 85, 2.5], ['PRESS HOMBRO', 50, 2.5], ['DOMINADAS', 90, 2.5], ['SALTO HORIZONTAL', 2.3, 0.05],
-   ['VEL MAX', 26, 0.3]].forEach(function (p) {
-    var s = serie(p[1], p[2]);
-    ej[p[0]] = {evolucion: s, actual: s[s.length - 1].valor, record: Math.max.apply(null, s.map(function (x) { return x.valor; })), fechaRecord: s[s.length - 1].fecha};
-  });
-  // Bronco: a diferencia del resto, el récord (y el mejor valor) es el MENOR, no el mayor.
-  var sBronco = serie(320, -4);
-  ej.BRONCO = {evolucion: sBronco, actual: sBronco[sBronco.length - 1].valor, record: Math.min.apply(null, sBronco.map(function (x) { return x.valor; })), fechaRecord: sBronco[sBronco.length - 1].fecha};
-  return {
-    nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej, pesoActual: 84.2, alturaActual: 181,
-    partidos: {minutos: 220, partidos: 4, lesiones: 0, equipo: 'EQUIPO A', ultimo: {fecha: new Date(hoy.getTime() - 5 * 86400000).toISOString(), equipo: 'EQUIPO A', minutos: 60}},
-    equiposPartido: ['EQUIPO A', 'EQUIPO B', 'EQUIPO C']
-  };
-}
-function datosDemoRanking_() {
-  // menor: el mejor valor es el más bajo (Bronco). conRel: si tiene sentido mostrar 1RM/peso
-  // (no aplica a Campo: Bronco es tiempo, Vel Max es km/h, ninguno es un cociente contra el peso).
-  function top(base, menor, conRel) {
-    var nombres = ['Pérez Juan', 'Gómez Lucas', 'Fernández Tomás', 'Rodríguez Nico', 'Jugador de ejemplo', 'López Fede', 'García Iñaki'];
-    return nombres.map(function (n, i) { var v = menor ? base + i * 4 : base - i * 4; return {nombre: n, v: v, rel: conRel ? v / 85 : null}; });
-  }
-  var out = {};
-  EJERCICIOS_POTENCIA.concat(EJERCICIOS_FUERZA).concat(['SALTO HORIZONTAL']).forEach(function (e, i) {
-    var t = top(100 - i * 3, false, true);
-    out[e] = {club: t, camada: t.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
-  });
-  var tv = top(73, false, false);
-  out['VEL MAX'] = {club: tv, camada: tv.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
-  var tb = top(290, true, false);
-  out.BRONCO = {club: tb, camada: tb.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
-  var tm = top(220, false, false);
-  out.MINUTOS = {club: tm, camada: tm.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
-  var tp = top(4, false, false);
-  out.PARTIDOS = {club: tp, camada: tp.slice(0, 5), miPuestoClub: 5, miPuestoCamada: 3};
-  return {nombre: 'Jugador de ejemplo', camada: 'M17', ranking: out};
-}
-function datosDemoAvisos_() {
-  var hoy = new Date();
-  return {
-    esCoach: false, miCamada: 'M17', vistosHasta: null,
-    cumpleanos: [{nombre: 'Gómez Lucas', fecha: new Date(hoy.getTime() + 2 * 86400000).toISOString(), hoy: false}],
-    avisos: [
-      {id: '1', fecha: new Date(hoy.getTime() - 3600000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'TODOS', texto: 'Mañana entrenamos 1 hora más temprano.'},
-      {id: '2', fecha: new Date(hoy.getTime() - 86400000).toISOString(), autor: 'cuerpo técnico', destinoTipo: 'CAMADA', destinoValor: 'M17', texto: 'Buen laburo esta semana, M17.'}
-    ],
-    solicitudes: []
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -163,10 +100,7 @@ function salir_() {
 
 // El token de Google dura ~1 hora. Si quedó uno viejo en localStorage, entrarAlApp_() lo usa
 // igual (no hay forma de saber que venció sin preguntarle al backend) y recién ahí el backend
-// lo rechaza. Antes ese rechazo cualquier error no reconocido se trataba como "modo demo" --
-// el jugador terminaba viendo datos de ejemplo sin ningún botón para volver a entrar de verdad
-// (iniciarGoogle() nunca se había llamado esa carga de página). Ahora se distingue ese caso
-// puntual y se manda de nuevo a loguearse.
+// lo rechaza -- acá se manda de nuevo a loguearse.
 function sesionVencida_() {
   salir_();
   document.getElementById('loginMsg').textContent = 'Tu sesión venció, volvé a entrar con Google.';
@@ -180,8 +114,7 @@ function entrarAlApp_() {
 }
 
 // ---------------------------------------------------------------------------
-// Llamadas al backend (Apps Script Web App). Si no está configurado o falla,
-// se cae a los datos de ejemplo y se muestra el cartel de DEMO.
+// Llamadas al backend (Apps Script Web App).
 // ---------------------------------------------------------------------------
 function backendGet_(action, params) {
   if (!configLista_()) return Promise.reject('sin-config');
@@ -195,7 +128,7 @@ function backendGet_(action, params) {
     }
     if (j.error == 'PENDIENTE_APROBACION') { mostrarPendiente_(); return Promise.reject('pendiente'); }
     if (j.error == 'RECHAZADO') { mostrarRechazado_(); return Promise.reject('rechazado'); }
-    if (j.error == 'No autorizado' && state.token != 'demo') { sesionVencida_(); return Promise.reject('no-autorizado'); }
+    if (j.error == 'No autorizado') { sesionVencida_(); return Promise.reject('no-autorizado'); }
     if (j.error) return Promise.reject(j.error);
     return j;
   });
@@ -245,29 +178,27 @@ function entrarComoStaff_() {
   irAPantalla_('Ranking');
 }
 
-function marcarDemo_(si) { document.getElementById('demoBanner').classList.toggle('hidden', !si); state.demo = si; }
-
-// Errores que ya muestran su propia pantalla (login) y no tienen que caer en modo demo.
+// Errores que ya muestran su propia pantalla (login) y no tienen que mostrar nada más acá.
 var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'es-staff', 'no-autorizado', 'pendiente', 'rechazado'];
 
 function cargarMisDatos_() {
-  backendGet_('misdatos').then(function (d) { marcarDemo_(false); state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); renderMisDatos_(datosDemoMisDatos_()); cargarAvisos_(); });
+  backendGet_('misdatos').then(function (d) { state.esCoach = !!d.esCoach; renderMisDatos_(d); cargarAvisos_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('misdatos', err); });
 }
 
 function cargarRanking_() {
-  backendGet_('ranking').then(function (d) { marcarDemo_(false); state.ranking = d; renderRanking_(); })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+  backendGet_('ranking').then(function (d) { state.ranking = d; renderRanking_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('ranking', err); });
 }
 
 function cargarRankingCoach_() {
-  backendGet_('rankingCoach', {camada: state.coachCamada}).then(function (d) { marcarDemo_(false); state.coachPartidos = d; renderCoachPartidos_(); })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; /* sin demo para esta vista: solo la usa el coach */ });
+  backendGet_('rankingCoach', {camada: state.coachCamada}).then(function (d) { state.coachPartidos = d; renderCoachPartidos_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('rankingCoach', err); });
 }
 
 function cargarAvisos_() {
-  backendGet_('avisos').then(function (d) { marcarDemo_(false); state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || []; renderAvisos_(); actualizarBadge_(); })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); state.avisos = datosDemoAvisos_(); state.jugadoresLista = []; state.solicitudes = []; renderAvisos_(); actualizarBadge_(); });
+  backendGet_('avisos').then(function (d) { state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || []; renderAvisos_(); actualizarBadge_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('avisos', err); });
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +421,7 @@ function enviarInformePorMail_() {
   var destino = document.getElementById('mailDestino').value;
   var jugador = document.getElementById('mailJugador').value.trim();
   if (destino == 'JUGADOR' && !jugador) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí el nombre del jugador.'; return; }
-  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'Backend sin configurar: no se envió nada de verdad.'; return; }
   var btn = document.getElementById('mailEnviarBtn');
   if (btn.disabled) return;
   btn.disabled = true;
@@ -549,7 +480,7 @@ function renderPreviewJugador_(nombre, md) {
 // 🗂 Revisar (solo coach): últimas cargas de su camada, con opción de borrar.
 // ---------------------------------------------------------------------------
 function cargarRevisar_() {
-  backendGet_('revisar', {camada: state.revisarCamada}).then(function (d) { marcarDemo_(false); state.revisar = d; renderRevisar_(); })
+  backendGet_('revisar', {camada: state.revisarCamada}).then(function (d) { state.revisar = d; renderRevisar_(); })
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; });
 }
 
@@ -819,7 +750,7 @@ function enviarAviso_() {
     : destinoTipo == 'JUGADOR' ? document.getElementById('avJugador').value.trim() : '';
   if (!texto) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí un mensaje.'; return; }
   if (destinoTipo == 'JUGADOR' && !destinoValor) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí el nombre del jugador.'; return; }
-  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'Backend sin configurar: no se envió nada de verdad.'; return; }
   var btn = document.getElementById('avEnviarBtn');
   if (btn.disabled) return;   // evita doble envío por doble tap mientras ya está en curso
   btn.disabled = true;
@@ -934,7 +865,7 @@ function enviarCarga_() {
   if (!ejercicios.length && !body.pesoCorporal && !body.altura) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá al menos un dato.'; return; }
   var repsInvalidas = ejercicios.filter(function (e) { return e.reps && (Number(e.reps) < 1 || Number(e.reps) > 15); });
   if (repsInvalidas.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Reps fuera de rango en ' + repsInvalidas.map(function (e) { return e.nombre; }).join(', ') + ' (tiene que ser de 1 a 15).'; return; }
-  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'Backend sin configurar: no se envió nada de verdad.'; return; }
   var btn = document.getElementById('submitBtn');
   if (btn.disabled) return;   // evita doble envío por doble tap mientras ya está en curso
   btn.disabled = true;
@@ -963,7 +894,7 @@ function enviarPartido_() {
   if (lesion == 'NO' && !body.minutos) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá los minutos que jugaste.'; return; }
   if (lesion != 'NO' && !body.zona) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí la zona de la lesión.'; return; }
   if (lesion != 'NO' && !body.detalle.trim()) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí qué fue la lesión.'; return; }
-  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'Backend sin configurar: no se envió nada de verdad.'; return; }
   var btn = document.getElementById('partidoBtn');
   if (btn.disabled) return;
   btn.disabled = true;
@@ -1012,7 +943,6 @@ function irAPantalla_(nombre) {
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.tab').forEach(function (t) { t.onclick = function () { irAPantalla_(t.getAttribute('data-screen')); }; });
   document.getElementById('logoutBtn').onclick = salir_;
-  document.getElementById('demoBtn').onclick = function () { state.token = 'demo'; entrarAlApp_(); };
   document.getElementById('submitBtn').onclick = enviarCarga_;
   document.getElementById('cRpe').oninput = function (e) { document.getElementById('rpeVal').textContent = e.target.value; };
   document.getElementById('avEnviarBtn').onclick = enviarAviso_;

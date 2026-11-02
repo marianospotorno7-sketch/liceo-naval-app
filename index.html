@@ -59,9 +59,6 @@ input,select{font-family:var(--sans);}
 #gBtn{margin-top:8px;transform:scale(1.14);transform-origin:center;margin-bottom:6px;}
 #loginMsg{font-family:var(--mono);font-size:12px;color:var(--red);max-width:320px;}
 #ingresoLink{font-family:var(--mono);font-size:12px;color:var(--accent);text-decoration:none;border:1px solid var(--border2);padding:10px 16px;border-radius:20px;}
-#demoBtn{background:#080d1466;border:1px solid var(--accent);color:var(--text);font-family:var(--mono);
-  font-size:12px;padding:12px 20px;border-radius:18px;cursor:pointer;min-height:44px;}
-#demoBtn:active{background:var(--accent-dim);}
 .legal-links{font-family:var(--mono);font-size:10.5px;color:var(--text-mid);margin-top:8px;text-shadow:0 1px 6px rgba(0,0,0,.9);}
 .legal-links a{color:var(--text-mid);}
 @media (max-width:480px){
@@ -153,9 +150,6 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 #submitBtn:disabled, #avEnviarBtn:disabled, #partidoBtn:disabled{opacity:.55;cursor:not-allowed;}
 #cargaMsg, #partidoMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
 
-.demobanner{background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold-bright);font-family:var(--mono);
-  font-size:10.5px;text-align:center;padding:7px;border-radius:9px;margin-bottom:14px;}
-
 /* ---------- Avisos ---------- */
 #composeBox select, #composeBox input{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);
   border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:9px;transition:border-color .15s;}
@@ -184,7 +178,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 /* ---------- Imprimir / PDF: solo la vista activa, sin nav ni chrome ---------- */
 @media print{
   body{background:#fff;color:#111;}
-  nav.tabs, header.topbar, .btnrow, .btn-outline, #logoutBtn, #demoBanner, .pillrow, fieldset#cargaCierre,
+  nav.tabs, header.topbar, .btnrow, .btn-outline, #logoutBtn, .pillrow, fieldset#cargaCierre,
   #submitBtn, #partidoBtn, #cargaMsg, #partidoMsg{display:none !important;}
   .screen{display:none !important;}
   .screen.active{display:block !important;}
@@ -204,7 +198,6 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
   <div id="gBtn"></div>
   <div id="loginMsg"></div>
   <a id="ingresoLink" class="hidden" href="#" target="_blank" rel="noopener">Completar form de ingreso</a>
-  <button id="demoBtn">Ver demo sin login</button>
   <div class="legal-links">
     <a href="./privacidad.html">Privacidad</a> · <a href="./terminos.html">Condiciones</a>
   </div>
@@ -220,8 +213,6 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     </div>
     <button id="logoutBtn">Salir</button>
   </header>
-
-  <div id="demoBanner" class="demobanner hidden">MODO DEMO — el backend todavía no está conectado. Esto es un ejemplo.</div>
 
   <!-- -------- Mis Datos -------- -->
   <section class="screen active" id="screenDatos">
