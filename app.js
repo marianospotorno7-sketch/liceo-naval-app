@@ -45,7 +45,14 @@ function etiqueta_(nombre) { return ETIQUETAS[nombre] || nombre; }
 var ETIQUETAS_CARGA = {'SENTADILLA': 'SENTADILLA PROFUNDA'};
 function etiquetaCarga_(nombre) { return ETIQUETAS_CARGA[nombre] || etiqueta_(nombre); }
 
-var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false, jugadoresLista: [], solicitudes: []};
+// Tiene que ser EXACTAMENTE la misma lista que ZONAS_LESION en el backend.
+var ZONAS_LESION = ['Cabeza / conmoción', 'Cuello', 'Hombro', 'Brazo / codo', 'Mano / muñeca', 'Pecho / costillas',
+  'Espalda / lumbar', 'Cadera / ingle', 'Muslo anterior (cuádriceps)', 'Muslo posterior (isquios)', 'Rodilla',
+  'Pierna / gemelo', 'Tobillo', 'Pie', 'Otra'];
+var CAMADAS_COACH = ['M15', 'M16', 'M17', 'M19', 'PLANTEL', 'G2 PS'];
+
+var state = {token: null, demo: false, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', avisos: null, esCoach: false,
+  jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -73,7 +80,11 @@ function datosDemoMisDatos_() {
   // Bronco: a diferencia del resto, el récord (y el mejor valor) es el MENOR, no el mayor.
   var sBronco = serie(320, -4);
   ej.BRONCO = {evolucion: sBronco, actual: sBronco[sBronco.length - 1].valor, record: Math.min.apply(null, sBronco.map(function (x) { return x.valor; })), fechaRecord: sBronco[sBronco.length - 1].fecha};
-  return {nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej, pesoActual: 84.2, alturaActual: 181};
+  return {
+    nombre: 'Jugador de ejemplo', puesto: '06- TERCERA LINEA', cargasTotales: 42, cargasMes: 9, ejercicios: ej, pesoActual: 84.2, alturaActual: 181,
+    partidos: {minutos: 220, partidos: 4, lesiones: 0, equipo: 'EQUIPO A', ultimo: {fecha: new Date(hoy.getTime() - 5 * 86400000).toISOString(), equipo: 'EQUIPO A', minutos: 60}},
+    equiposPartido: ['EQUIPO A', 'EQUIPO B', 'EQUIPO C']
+  };
 }
 function datosDemoRanking_() {
   // menor: el mejor valor es el más bajo (Bronco). conRel: si tiene sentido mostrar 1RM/peso
@@ -160,9 +171,10 @@ function entrarAlApp_() {
 // Llamadas al backend (Apps Script Web App). Si no está configurado o falla,
 // se cae a los datos de ejemplo y se muestra el cartel de DEMO.
 // ---------------------------------------------------------------------------
-function backendGet_(action) {
+function backendGet_(action, params) {
   if (!configLista_()) return Promise.reject('sin-config');
   var url = CONFIG.BACKEND_URL + '?token=' + encodeURIComponent(state.token) + '&action=' + action;
+  Object.keys(params || {}).forEach(function (k) { url += '&' + k + '=' + encodeURIComponent(params[k]); });
   return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
     if (j.error == 'SIN_VINCULAR') {
       if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
@@ -200,7 +212,10 @@ function entrarComoCoach_() {
   state.esCoach = true;
   document.getElementById('hNombre').textContent = 'Cuerpo técnico';
   document.getElementById('hCamada').textContent = 'Liceo Naval';
-  document.querySelectorAll('.tab').forEach(function (t) { if (t.getAttribute('data-screen') != 'Avisos') t.style.display = 'none'; });
+  document.querySelectorAll('.tab').forEach(function (t) {
+    var pantalla = t.getAttribute('data-screen');
+    t.style.display = (pantalla == 'Avisos' || pantalla == 'Ranking') ? '' : 'none';
+  });
   irAPantalla_('Avisos');
   cargarAvisos_();
 }
@@ -218,6 +233,11 @@ function cargarMisDatos_() {
 function cargarRanking_() {
   backendGet_('ranking').then(function (d) { marcarDemo_(false); state.ranking = d; renderRanking_(); })
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; marcarDemo_(true); state.ranking = datosDemoRanking_(); renderRanking_(); });
+}
+
+function cargarRankingCoach_() {
+  backendGet_('rankingCoach', {camada: state.coachCamada}).then(function (d) { marcarDemo_(false); state.coachPartidos = d; renderCoachPartidos_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; /* sin demo para esta vista: solo la usa el coach */ });
 }
 
 function cargarAvisos_() {
@@ -260,6 +280,8 @@ function renderMisDatos_(d) {
   document.getElementById('statMes').textContent = d.cargasMes;
   document.getElementById('statPeso').textContent = d.pesoActual != null ? d.pesoActual : '—';
   document.getElementById('statAltura').textContent = d.alturaActual != null ? d.alturaActual : '—';
+  document.getElementById('statPartidos').textContent = d.partidos ? d.partidos.partidos : 0;
+  document.getElementById('statMinutos').textContent = d.partidos ? d.partidos.minutos : 0;
 
   var gp = document.getElementById('grupoPotencia'); gp.innerHTML = '';
   EJERCICIOS_POTENCIA.forEach(function (e) { gp.appendChild(tarjetaEj_(e, d.ejercicios[e], 'kg')); });
@@ -312,6 +334,60 @@ function renderRanking_() {
 
   var cl = document.getElementById('rankClub'); cl.innerHTML = ''; cl.appendChild(tablaRanking_(r.club, r.miPuestoClub, nm, unidad));
   document.getElementById('miPosClub').textContent = r.miPuestoClub ? 'Tu puesto en el club: ' + r.miPuestoClub + '°' : 'Todavía no tenés cargas de este ejercicio';
+}
+
+// ---------------------------------------------------------------------------
+// Render: Partidos y lesiones (solo coach)
+// ---------------------------------------------------------------------------
+function renderCoachPartidos_() {
+  var d = state.coachPartidos; if (!d) return;
+  var sel = document.getElementById('coachCamada');
+  if (sel.value !== state.coachCamada) sel.value = state.coachCamada;
+
+  var faltanBox = document.getElementById('coachFaltanBox'); faltanBox.innerHTML = '';
+  if (d.faltan && d.faltan.length) {
+    var t1 = document.createElement('div'); t1.className = 'exgroup-title'; t1.textContent = '⚠️ No cargaron partido (' + d.faltan.length + ')';
+    faltanBox.appendChild(t1);
+    d.faltan.forEach(function (f) {
+      var div = document.createElement('div'); div.className = 'avisocard';
+      div.innerHTML = '<div class="meta">' + f.camada + '</div><div class="texto">' + f.nombre + (f.ultimo ? ' — último: ' + fmtFecha_(f.ultimo) : ' — nunca cargó') + '</div>';
+      faltanBox.appendChild(div);
+    });
+  }
+
+  var infBox = document.getElementById('coachInformeBox'); infBox.innerHTML = '';
+  var t2 = document.createElement('div'); t2.className = 'exgroup-title'; t2.textContent = '📋 Informe de partidos';
+  infBox.appendChild(t2);
+  if (!d.informe || !d.informe.length) { infBox.innerHTML += '<div class="exempty">Sin jugadores en esta camada.</div>'; }
+  (d.informe || []).forEach(function (r) {
+    var div = document.createElement('div'); div.className = 'excard';
+    var porEquipoTxt = Object.keys(r.porEquipo || {}).map(function (e) { return e + ': ' + r.porEquipo[e].p + 'p/' + r.porEquipo[e].m + 'min'; }).join(' · ');
+    div.innerHTML = '<div class="exname">' + r.nombre + '</div>' +
+      '<div class="exrow"><div class="exval">' + r.partidos + ' <small>partidos</small></div><div class="exrecord">' + r.minutos + ' min · prom ' + r.promedio + '</div></div>' +
+      (porEquipoTxt ? '<div class="lastmark" style="margin-top:6px;">' + porEquipoTxt + '</div>' : '') +
+      (r.lesiones ? '<div class="lastmark" style="color:var(--red);margin-top:4px;">🩹 ' + r.lesiones + (r.lesiones == 1 ? ' lesión' : ' lesiones') + '</div>' : '');
+    infBox.appendChild(div);
+  });
+
+  var lesBox = document.getElementById('coachLesionesBox'); lesBox.innerHTML = '';
+  var t3 = document.createElement('div'); t3.className = 'exgroup-title'; t3.textContent = '🩹 Lesiones (' + (d.lesiones ? d.lesiones.total : 0) + ')';
+  lesBox.appendChild(t3);
+  if (d.lesiones && d.lesiones.total) {
+    function resumenLinea(titulo, lista) {
+      return '<div class="lastmark" style="margin-bottom:4px;">' + titulo + ': ' + lista.map(function (x) { return x.clave + ' (' + x.n + ')'; }).join(' · ') + '</div>';
+    }
+    var res = document.createElement('div'); res.className = 'rankbox';
+    res.innerHTML = resumenLinea('Por zona', d.lesiones.porZona) + resumenLinea('Por ' + (state.coachCamada == 'TODAS' ? 'camada' : 'equipo'), d.lesiones.porEquipo) + resumenLinea('Por momento', d.lesiones.porMomento);
+    lesBox.appendChild(res);
+    d.lesiones.lista.forEach(function (p) {
+      var div = document.createElement('div'); div.className = 'avisocard';
+      div.innerHTML = '<div class="meta">' + fmtFecha_(p.fecha) + ' · ' + p.nombre + ' · ' + p.equipo + '</div>' +
+        '<div class="texto">' + (p.lesion == 'SEMANA PREVIA' ? '(semana previa) ' : '') + p.zona + (p.detalle ? ' — ' + p.detalle : '') + '</div>';
+      lesBox.appendChild(div);
+    });
+  } else {
+    lesBox.innerHTML += '<div class="exempty">Sin lesiones cargadas en esta vista.</div>';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,6 +585,20 @@ function pintarCamposCarga_() {
   var alturaInfo = state.misDatos && state.misDatos.alturaActual;
   document.getElementById('lastAltura').textContent = alturaInfo != null ? 'Última: ' + alturaInfo + ' cm' : '';
   document.getElementById('cFecha').value = new Date().toISOString().slice(0, 10);
+  pintarCamposPartido_();
+}
+
+function pintarCamposPartido_() {
+  var equipos = (state.misDatos && state.misDatos.equiposPartido) || [];
+  var sel = document.getElementById('pEquipo');
+  sel.innerHTML = '<option value="">Elegí el equipo</option>' + equipos.map(function (e) { return '<option value="' + e + '">' + e + '</option>'; }).join('');
+  var selZona = document.getElementById('pZona');
+  if (selZona.options.length <= 1) {
+    selZona.innerHTML = '<option value="">Elegí la zona</option>' + ZONAS_LESION.map(function (z) { return '<option value="' + z + '">' + z + '</option>'; }).join('');
+  }
+  document.getElementById('pFecha').value = new Date().toISOString().slice(0, 10);
+  var p = state.misDatos && state.misDatos.partidos;
+  document.getElementById('lastPartido').textContent = (p && p.ultimo) ? 'Último: ' + p.ultimo.equipo + ' · ' + p.ultimo.minutos + ' min · ' + fmtFecha_(p.ultimo.fecha) : '';
 }
 
 function recolectarEjercicios_() {
@@ -558,6 +648,38 @@ function enviarCarga_() {
     .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
 }
 
+function enviarPartido_() {
+  var msg = document.getElementById('partidoMsg');
+  var lesion = document.getElementById('pLesion').value;
+  var body = {
+    token: state.token, action: 'partido', fecha: document.getElementById('pFecha').value,
+    equipo: document.getElementById('pEquipo').value, minutos: document.getElementById('pMinutos').value,
+    lesion: lesion, zona: document.getElementById('pZona').value, detalle: document.getElementById('pDetalle').value
+  };
+  if (!body.equipo) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí el equipo.'; return; }
+  if (lesion == 'NO' && !body.minutos) { msg.style.color = 'var(--red)'; msg.textContent = 'Cargá los minutos que jugaste.'; return; }
+  if (lesion != 'NO' && !body.zona) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí la zona de la lesión.'; return; }
+  if (lesion != 'NO' && !body.detalle.trim()) { msg.style.color = 'var(--red)'; msg.textContent = 'Escribí qué fue la lesión.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'MODO DEMO: no se envió nada de verdad (falta configurar el backend).'; return; }
+  var btn = document.getElementById('partidoBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      btn.disabled = false;
+      if (j.error == 'No autorizado') { sesionVencida_(); return; }
+      if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
+      msg.style.color = 'var(--green)'; msg.textContent = '¡Partido cargado!';
+      document.getElementById('pMinutos').value = ''; document.getElementById('pDetalle').value = '';
+      document.getElementById('pLesion').value = 'NO';
+      document.getElementById('pZonaWrap').classList.add('hidden'); document.getElementById('pDetalleWrap').classList.add('hidden');
+      cargarMisDatos_();
+    })
+    .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+}
+
 // ---------------------------------------------------------------------------
 // Navegación entre pantallas
 // ---------------------------------------------------------------------------
@@ -565,7 +687,12 @@ function irAPantalla_(nombre) {
   document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
   document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-screen') == nombre); });
   document.getElementById('screen' + nombre).classList.add('active');
-  if (nombre == 'Ranking' && !state.ranking) cargarRanking_();
+  if (nombre == 'Ranking') {
+    document.getElementById('coachPartidosBox').classList.toggle('hidden', !state.esCoach);
+    document.getElementById('miRankingBox').classList.toggle('hidden', state.esCoach && !state.misDatos);
+    if (state.esCoach) cargarRankingCoach_();
+    if (state.misDatos && !state.ranking) cargarRanking_();
+  }
   if (nombre == 'Carga') pintarCamposCarga_();
   if (nombre == 'Avisos') { cargarAvisos_(); marcarAvisosVistos_(); document.getElementById('avBadge').classList.add('hidden'); }
 }
@@ -589,6 +716,13 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('avJugador').addEventListener('blur', function () {
     setTimeout(function () { document.getElementById('avJugadorSugerencias').classList.add('hidden'); }, 150);
   });
+  document.getElementById('coachCamada').onchange = function (e) { state.coachCamada = e.target.value; cargarRankingCoach_(); };
+  document.getElementById('partidoBtn').onclick = enviarPartido_;
+  document.getElementById('pLesion').onchange = function (e) {
+    var hayLesion = e.target.value != 'NO';
+    document.getElementById('pZonaWrap').classList.toggle('hidden', !hayLesion);
+    document.getElementById('pDetalleWrap').classList.toggle('hidden', !hayLesion);
+  };
 
   var token = null;
   try { token = localStorage.getItem('liceo_token'); } catch (e) {}

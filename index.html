@@ -135,10 +135,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 .exrow2 .fitem{flex:1;}
 .lastmark{font-family:var(--mono);font-size:10px;color:var(--blue);margin-bottom:6px;}
 #rpeVal{color:var(--accent);font-weight:800;}
-#submitBtn{width:100%;background:var(--accent);border:none;color:#06222e;font-weight:800;font-family:var(--sans);
+#submitBtn, #partidoBtn{width:100%;background:var(--accent);border:none;color:#06222e;font-weight:800;font-family:var(--sans);
   font-size:15px;padding:14px;border-radius:12px;cursor:pointer;margin-top:4px;box-shadow:0 6px 20px -6px var(--accent-dim);}
-#submitBtn:disabled, #avEnviarBtn:disabled{opacity:.55;cursor:not-allowed;}
-#cargaMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
+#submitBtn:disabled, #avEnviarBtn:disabled, #partidoBtn:disabled{opacity:.55;cursor:not-allowed;}
+#cargaMsg, #partidoMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
 
 .demobanner{background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold-bright);font-family:var(--mono);
   font-size:10.5px;text-align:center;padding:7px;border-radius:9px;margin-bottom:14px;}
@@ -208,6 +208,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
       <div class="statbox"><div class="num" id="statPeso">—</div><div class="lbl">Peso actual (kg)</div></div>
       <div class="statbox"><div class="num" id="statAltura">—</div><div class="lbl">Altura actual (cm)</div></div>
     </div>
+    <div class="statrow">
+      <div class="statbox"><div class="num" id="statPartidos">—</div><div class="lbl">Partidos jugados</div></div>
+      <div class="statbox"><div class="num" id="statMinutos">—</div><div class="lbl">Minutos jugados</div></div>
+    </div>
     <div class="exgroup-title">Potencia</div>
     <div id="grupoPotencia"></div>
     <div class="exgroup-title">Fuerza</div>
@@ -220,16 +224,32 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 
   <!-- -------- Ranking -------- -->
   <section class="screen" id="screenRanking">
-    <div class="chiprow" id="rankChips"></div>
-    <div class="rankbox">
-      <h3>Top 10 — tu camada</h3>
-      <div id="rankCamada"></div>
-      <div class="mypos" id="miPosCamada"></div>
+    <div id="coachPartidosBox" class="hidden">
+      <div class="exgroup-title">Partidos y lesiones</div>
+      <div class="fitem">
+        <label>Camada</label>
+        <select id="coachCamada">
+          <option value="TODAS">Todo el club</option>
+          <option value="M15">M15</option><option value="M16">M16</option><option value="M17">M17</option>
+          <option value="M19">M19</option><option value="PLANTEL">PLANTEL</option><option value="G2 PS">G2 PS</option>
+        </select>
+      </div>
+      <div id="coachFaltanBox"></div>
+      <div id="coachInformeBox"></div>
+      <div id="coachLesionesBox"></div>
     </div>
-    <div class="rankbox">
-      <h3>Top 10 — club</h3>
-      <div id="rankClub"></div>
-      <div class="mypos" id="miPosClub"></div>
+    <div id="miRankingBox">
+      <div class="chiprow" id="rankChips"></div>
+      <div class="rankbox">
+        <h3>Top 10 — tu camada</h3>
+        <div id="rankCamada"></div>
+        <div class="mypos" id="miPosCamada"></div>
+      </div>
+      <div class="rankbox">
+        <h3>Top 10 — club</h3>
+        <div id="rankClub"></div>
+        <div class="mypos" id="miPosClub"></div>
+      </div>
     </div>
   </section>
 
@@ -303,6 +323,41 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 
     <button id="submitBtn">Cargar sesión</button>
     <div id="cargaMsg"></div>
+
+    <fieldset>
+      <legend>Partido</legend>
+      <div class="lastmark" id="lastPartido"></div>
+      <div class="fitem">
+        <label>Fecha del partido</label>
+        <input type="date" id="pFecha">
+      </div>
+      <div class="fitem">
+        <label>Equipo</label>
+        <select id="pEquipo"><option value="">Elegí el equipo</option></select>
+      </div>
+      <div class="fitem">
+        <label>Minutos jugados</label>
+        <input type="text" inputmode="numeric" id="pMinutos" placeholder="ej. 60">
+      </div>
+      <div class="fitem">
+        <label>¿Hubo lesión?</label>
+        <select id="pLesion">
+          <option value="NO">No</option>
+          <option value="DURANTE EL PARTIDO">Sí, durante el partido</option>
+          <option value="SEMANA PREVIA">Sí, en la semana previa</option>
+        </select>
+      </div>
+      <div class="fitem hidden" id="pZonaWrap">
+        <label>Zona</label>
+        <select id="pZona"><option value="">Elegí la zona</option></select>
+      </div>
+      <div class="fitem hidden" id="pDetalleWrap">
+        <label>¿Cuál? (hasta 50 caracteres)</label>
+        <input type="text" id="pDetalle" maxlength="50" placeholder="ej. esguince de tobillo">
+      </div>
+    </fieldset>
+    <button id="partidoBtn">Cargar partido</button>
+    <div id="partidoMsg"></div>
   </section>
 
   <!-- -------- Avisos -------- -->
