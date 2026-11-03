@@ -600,7 +600,8 @@ function renderSolicitudes_() {
   box.appendChild(msg);
   lista.forEach(function (s) {
     var div = document.createElement('div'); div.className = 'avisocard unread';
-    var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = (s.camada || 'sin camada') + ' · ' + (s.puesto || 'sin puesto');
+    var meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = (s.camada || 'sin camada') + ' · ' + (s.puesto || 'sin puesto') + (s.conocido ? ' · ✅ ya puede entrar (matcheó con la base)' : ' · 🔒 bloqueado hasta aprobar');
     var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = s.nombre + ' — ' + s.email;
     div.appendChild(meta); div.appendChild(texto);
     // PLANTEL/G2 PS se corrigen acá (mismo "Superior" del form ambiguo entre las dos) -- M15..M19
