@@ -58,9 +58,33 @@ var ZONAS_LESION = ['Cabeza / conmoción', 'Cuello', 'Hombro', 'Brazo / codo', '
   'Pierna / gemelo', 'Tobillo', 'Pie', 'Otra'];
 var CAMADAS_COACH = ['M15', 'M16', 'M17', 'M19', 'PLANTEL', 'G2 PS'];
 
+// Listas cerradas de la pantalla Lesiones (cuerpo médico / PFs) -- tienen que ser EXACTAMENTE
+// las mismas que las del backend (apps_script_base_liceo.gs).
+var ZONAS_LESION_CLINICA = ['Cabeza / cara', 'Cuello / columna cervical', 'Columna dorsal / tórax / costillas', 'Abdomen',
+  'Columna lumbar', 'Pelvis / sacro', 'Hombro / clavícula', 'Brazo', 'Codo', 'Antebrazo', 'Muñeca', 'Mano / dedos / pulgar',
+  'Cadera / ingle', 'Muslo anterior (cuádriceps)', 'Muslo posterior (isquiotibiales)', 'Muslo aductor', 'Rodilla',
+  'Pierna (gemelo / sóleo)', 'Tendón de Aquiles', 'Tobillo', 'Pie / dedos'];
+var LADOS_LESION = ['Derecha', 'Izquierda', 'Bilateral'];
+var TIPOS_LESION_CLINICA = ['Conmoción cerebral', 'Fractura', 'Fisura / microfractura', 'Luxación / subluxación',
+  'Esguince ligamentario', 'Lesión meniscal', 'Lesión tendinosa (tendinopatía / tendinitis)', 'Ruptura muscular (desgarro)',
+  'Distensión muscular', 'Sobrecarga / fatiga muscular', 'Contractura', 'Contusión / hematoma', 'Bursitis', 'Sinovitis',
+  'Lesión nerviosa', 'Laceración / corte', 'Lesión dental', 'Lesión visceral / abdominal', 'Cuadro febril / enfermedad', 'Otro'];
+var DIAGNOSTICOS_LESION = ['Desgarro de isquiotibiales', 'Desgarro de cuádriceps', 'Desgarro de aductores',
+  'Desgarro de gemelo / sóleo', 'Sobrecarga muscular', 'Rotura de LCA', 'Rotura de LCP', 'Esguince de LCI / LLE de rodilla',
+  'Lesión meniscal de rodilla', 'Síndrome patelofemoral', 'Esguince de tobillo', 'Tendinopatía de Aquiles',
+  'Luxación / subluxación de hombro', 'Luxación acromioclavicular', 'Tendinopatía del manguito rotador', 'Esguince cervical',
+  'Lumbalgia / lumbociatalgia', 'Pubalgia', 'Conmoción cerebral', 'Fractura (especificar en detalle)', 'Herida cortante',
+  'Otro (especificar en detalle)'];
+var RECURRENCIA_LESION = ['Sí', 'No'];
+var CAUSAS_LESION = ['Sin contacto', 'Contacto indirecto con otro jugador', 'Contacto indirecto con un objeto (pelota / suelo / poste)',
+  'Contacto directo con otro jugador', 'Contacto directo con un objeto (pelota / suelo / poste)'];
+var MECANISMOS_LESION = ['Tackleador', 'Tackleado', 'Scrum', 'Maul', 'Ruck', 'Line out', 'Colisión / choque', 'Carrera / sprint',
+  'Cambio de dirección', 'Salto', 'Caída', 'Patada', 'Try (anotando)', 'Pisotón', 'Sobreuso / sobrecarga (sin mecanismo puntual)', 'Otro'];
+
 var state = {token: null, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
   jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null,
-  esStaff: false, staffCamadas: null, revisar: null, revisarCamada: 'TODAS', previewJugador: null, cargaTab: 'gym'};
+  esStaff: false, staffCamadas: null, revisar: null, revisarCamada: 'TODAS', previewJugador: null, cargaTab: 'gym',
+  esMedico: false, lesionesJugadores: [], lesionesList: null};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -91,7 +115,7 @@ function onGoogleLogin_(resp) {
 }
 
 function salir_() {
-  state.token = null; state.esCoach = false;
+  state.token = null; state.esCoach = false; state.esMedico = false;
   try { localStorage.removeItem('liceo_token'); } catch (e) {}
   document.getElementById('appScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -128,6 +152,7 @@ function backendGet_(action, params) {
     if (j.error == 'SIN_VINCULAR') {
       if (j.esCoach) { entrarComoCoach_(); return Promise.reject('es-coach'); }
       if (j.esStaff) { entrarComoStaff_(); return Promise.reject('es-staff'); }
+      if (j.esMedico) { entrarComoMedico_(); return Promise.reject('es-medico'); }
       mostrarSinVincular_(); return Promise.reject('sin-vincular');
     }
     if (j.error == 'PENDIENTE_APROBACION') { mostrarPendiente_(); return Promise.reject('pendiente'); }
@@ -164,7 +189,7 @@ function entrarComoCoach_() {
   document.getElementById('hCamada').textContent = 'Liceo Naval';
   document.querySelectorAll('.tab').forEach(function (t) {
     var pantalla = t.getAttribute('data-screen');
-    t.style.display = (pantalla == 'Avisos' || pantalla == 'Ranking' || pantalla == 'Revisar') ? '' : 'none';
+    t.style.display = (pantalla == 'Avisos' || pantalla == 'Ranking' || pantalla == 'Revisar' || pantalla == 'Lesiones') ? '' : 'none';
   });
   irAPantalla_('Avisos');
   cargarAvisos_();
@@ -182,8 +207,21 @@ function entrarComoStaff_() {
   irAPantalla_('Ranking');
 }
 
+// Cuerpo médico: rol nuevo (3/11/2026), todo el club, solo carga/ve Lesiones + el informe de
+// Ranking (partidos/lesiones) -- no Avisos, no Carga, no Mis Datos, no Revisar.
+function entrarComoMedico_() {
+  state.esCoach = false; state.esStaff = false; state.esMedico = true;
+  document.getElementById('hNombre').textContent = 'Cuerpo médico';
+  document.getElementById('hCamada').textContent = 'Liceo Naval';
+  document.querySelectorAll('.tab').forEach(function (t) {
+    var pantalla = t.getAttribute('data-screen');
+    t.style.display = (pantalla == 'Ranking' || pantalla == 'Lesiones') ? '' : 'none';
+  });
+  irAPantalla_('Lesiones');
+}
+
 // Errores que ya muestran su propia pantalla (login) y no tienen que mostrar nada más acá.
-var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'es-staff', 'no-autorizado', 'pendiente', 'rechazado'];
+var ERRORES_CON_PANTALLA_PROPIA = ['sin-vincular', 'es-coach', 'es-staff', 'es-medico', 'no-autorizado', 'pendiente', 'rechazado'];
 
 function cargarMisDatos_() {
   backendGet_('misdatos').then(function (d) { state.esCoach = !!d.esCoach; renderMisDatos_(d); })
@@ -203,6 +241,16 @@ function cargarRankingCoach_() {
 function cargarAvisos_() {
   backendGet_('avisos').then(function (d) { state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || []; renderAvisos_(); actualizarBadge_(); })
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('avisos', err); });
+}
+
+function cargarLesionesJugadores_() {
+  backendGet_('jugadoresLesion').then(function (d) { state.lesionesJugadores = d.jugadores || []; })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('jugadoresLesion', err); });
+}
+
+function cargarLesionesList_() {
+  backendGet_('lesiones').then(function (d) { state.lesionesList = d.lesiones || []; renderLesionesList_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('lesiones', err); });
 }
 
 // ---------------------------------------------------------------------------
@@ -662,6 +710,12 @@ function guardarGrupoEmails_(accion, camada, mails) {
 
 function renderProfes_() { renderGrupoEmails_('profesBox', '⚙️ Profes', state.avisos && state.avisos.profes, 'guardarProfes'); }
 function renderStaff_() { renderGrupoEmails_('staffBox', '⚙️ Staff', state.avisos && state.avisos.staff, 'guardarStaff'); }
+// Médico es siempre todo el club (sin CAMADA en la hoja) -- se envuelve en el mismo formato
+// {camada, emails} que espera renderGrupoEmails_ para reusar esa UI de agregar/sacar mails.
+function renderMedico_() {
+  var m = state.avisos && state.avisos.medico;
+  renderGrupoEmails_('medicoBox', '⚙️ Cuerpo médico (todo el club)', m ? [{camada: 'Todo el club', emails: m}] : null, 'guardarMedico');
+}
 
 function renderAvisos_() {
   var d = state.avisos; if (!d) return;
@@ -673,6 +727,7 @@ function renderAvisos_() {
   renderSolicitudes_();
   renderProfes_();
   renderStaff_();
+  renderMedico_();
   if (d.esCoach) ajustarComposeBoxCargo_(d.camadasCargo);
 
   var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
@@ -919,6 +974,89 @@ function enviarPartido_() {
 }
 
 // ---------------------------------------------------------------------------
+// Lesiones (cuerpo médico / PFs): carga con listas cerradas + últimas cargadas.
+// ---------------------------------------------------------------------------
+function pintarCamposLesion_() {
+  document.getElementById('lesFecha').value = new Date().toISOString().slice(0, 10);
+  cargarLesionesJugadores_();
+  cargarLesionesList_();
+}
+
+// Mismo patrón que renderSugerenciasJugador_ (Avisos), sobre state.lesionesJugadores y el
+// buscador de la pantalla Lesiones -- no se reusa la misma lista: Avisos solo la manda al coach,
+// y el cuerpo médico (sin cargo) la pide por su cuenta con la acción 'jugadoresLesion'.
+function renderSugerenciasJugadorLesion_(q) {
+  var cont = document.getElementById('lesJugadorSugerencias');
+  var query = normalizarBusqueda_(q).trim();
+  if (!query) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
+  var coincidencias = (state.lesionesJugadores || [])
+    .filter(function (n) { return normalizarBusqueda_(n).indexOf(query) >= 0; })
+    .slice(0, 8);
+  cont.innerHTML = '';
+  if (!coincidencias.length) { cont.classList.add('hidden'); return; }
+  coincidencias.forEach(function (n) {
+    var div = document.createElement('div'); div.className = 'sug'; div.textContent = n;
+    div.onclick = function () { document.getElementById('lesJugador').value = n; cont.classList.add('hidden'); cont.innerHTML = ''; };
+    cont.appendChild(div);
+  });
+  cont.classList.remove('hidden');
+}
+
+function renderLesionesList_() {
+  var list = document.getElementById('lesList'); list.innerHTML = '';
+  var lista = state.lesionesList || [];
+  if (!lista.length) { list.innerHTML = '<div class="exempty">Sin lesiones cargadas todavía.</div>'; return; }
+  lista.forEach(function (x) {
+    var div = document.createElement('div'); div.className = 'avisocard';
+    var contexto = x.contexto == 'PARTIDO' ? ('Partido' + (x.minuto ? ' (min ' + x.minuto + ')' : '')) : 'Entrenamiento';
+    div.innerHTML = '<div class="meta">' + fmtFecha_(x.fecha) + ' · ' + x.jugador + ' · ' + x.camada + '</div>' +
+      '<div class="texto">' + contexto + ' — ' + x.zona + ' (' + x.lado + ') — ' + x.tipo + (x.diagnostico ? ' / ' + x.diagnostico : '') + '</div>' +
+      '<div class="lastmark" style="margin-top:4px;">' + x.causa + ' · ' + x.mecanismo + (x.recurrencia == 'Sí' ? ' · Recurrencia' : '') + '</div>' +
+      (x.detalle ? '<div class="lastmark">' + x.detalle + '</div>' : '');
+    list.appendChild(div);
+  });
+}
+
+function enviarLesion_() {
+  var msg = document.getElementById('lesMsg');
+  var jugador = document.getElementById('lesJugador').value.trim();
+  var contexto = document.getElementById('lesContexto').value;
+  var body = {
+    token: state.token, action: 'registrarLesion', jugador: jugador,
+    fecha: document.getElementById('lesFecha').value, contexto: contexto,
+    minuto: contexto == 'PARTIDO' ? document.getElementById('lesMinuto').value : '',
+    zona: document.getElementById('lesZona').value, lado: document.getElementById('lesLado').value,
+    tipo: document.getElementById('lesTipo').value, diagnostico: document.getElementById('lesDiagnostico').value,
+    recurrencia: document.getElementById('lesRecurrencia').value, causa: document.getElementById('lesCausa').value,
+    mecanismo: document.getElementById('lesMecanismo').value, detalle: document.getElementById('lesDetalle').value.trim()
+  };
+  if (!jugador) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí el jugador.'; return; }
+  if (!body.zona || !body.lado || !body.tipo || !body.diagnostico || !body.recurrencia || !body.causa || !body.mecanismo) {
+    msg.style.color = 'var(--red)'; msg.textContent = 'Completá todos los campos.'; return;
+  }
+  if (contexto == 'PARTIDO' && !body.minuto) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí el minuto.'; return; }
+  if (!configLista_()) { msg.style.color = 'var(--accent)'; msg.textContent = 'Backend sin configurar: no se envió nada de verdad.'; return; }
+  var btn = document.getElementById('lesEnviarBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  msg.style.color = 'var(--text-dim)'; msg.textContent = 'Enviando…';
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      btn.disabled = false;
+      if (j.error == 'No autorizado') { sesionVencida_(); return; }
+      if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
+      msg.style.color = 'var(--green)'; msg.textContent = '¡Lesión cargada!';
+      document.getElementById('lesJugador').value = ''; document.getElementById('lesDetalle').value = '';
+      ['lesZona', 'lesLado', 'lesTipo', 'lesDiagnostico', 'lesRecurrencia', 'lesCausa', 'lesMecanismo'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      cargarLesionesList_();
+    })
+    .catch(function () { btn.disabled = false; msg.style.color = 'var(--red)'; msg.textContent = 'No se pudo conectar. Probá de nuevo.'; });
+}
+
+// ---------------------------------------------------------------------------
 // Navegación entre pantallas
 // ---------------------------------------------------------------------------
 function irAPantalla_(nombre) {
@@ -926,7 +1064,7 @@ function irAPantalla_(nombre) {
   document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-screen') == nombre); });
   document.getElementById('screen' + nombre).classList.add('active');
   if (nombre == 'Ranking') {
-    var esStaffOCoach = state.esCoach || state.esStaff;
+    var esStaffOCoach = state.esCoach || state.esStaff || state.esMedico;
     document.getElementById('coachPartidosBox').classList.toggle('hidden', !esStaffOCoach);
     document.getElementById('miRankingBox').classList.toggle('hidden', esStaffOCoach && !state.misDatos);
     document.getElementById('verComoJugadorBtn').classList.toggle('hidden', !state.esCoach);   // staff no "ve como jugador"
@@ -939,6 +1077,7 @@ function irAPantalla_(nombre) {
   if (nombre == 'Carga') pintarCamposCarga_();
   if (nombre == 'Avisos') { cargarAvisos_(); marcarAvisosVistos_(); document.getElementById('avBadge').classList.add('hidden'); }
   if (nombre == 'Revisar') cargarRevisar_();
+  if (nombre == 'Lesiones') pintarCamposLesion_();
 }
 
 // ---------------------------------------------------------------------------
@@ -976,6 +1115,26 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('mailEnviarBtn').onclick = enviarInformePorMail_;
   document.getElementById('imprimirBtn').onclick = function () { window.print(); };
   document.getElementById('excelBtn').onclick = descargarExcel_;
+
+  function llenarSelect_(id, lista) {
+    var sel = document.getElementById(id);
+    lista.forEach(function (v) { var o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+  }
+  llenarSelect_('lesZona', ZONAS_LESION_CLINICA);
+  llenarSelect_('lesLado', LADOS_LESION);
+  llenarSelect_('lesTipo', TIPOS_LESION_CLINICA);
+  llenarSelect_('lesDiagnostico', DIAGNOSTICOS_LESION);
+  llenarSelect_('lesRecurrencia', RECURRENCIA_LESION);
+  llenarSelect_('lesCausa', CAUSAS_LESION);
+  llenarSelect_('lesMecanismo', MECANISMOS_LESION);
+  document.getElementById('lesEnviarBtn').onclick = enviarLesion_;
+  document.getElementById('lesContexto').onchange = function (e) {
+    document.getElementById('lesMinutoWrap').classList.toggle('hidden', e.target.value != 'PARTIDO');
+  };
+  document.getElementById('lesJugador').oninput = function (e) { renderSugerenciasJugadorLesion_(e.target.value); };
+  document.getElementById('lesJugador').addEventListener('blur', function () {
+    setTimeout(function () { document.getElementById('lesJugadorSugerencias').classList.add('hidden'); }, 150);
+  });
 
   var token = null;
   try { token = localStorage.getItem('liceo_token'); } catch (e) {}

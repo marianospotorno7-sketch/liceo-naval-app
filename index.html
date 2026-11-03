@@ -152,7 +152,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 #submitBtn, #partidoBtn{width:100%;background:var(--accent);border:none;color:#06222e;font-weight:800;font-family:var(--sans);
   font-size:15px;padding:14px;border-radius:12px;cursor:pointer;margin-top:4px;box-shadow:0 6px 20px -6px var(--accent-dim);}
 #submitBtn:disabled, #avEnviarBtn:disabled, #partidoBtn:disabled{opacity:.55;cursor:not-allowed;}
-#cargaMsg, #partidoMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
+#cargaMsg, #partidoMsg, #lesMsg{text-align:center;font-family:var(--mono);font-size:12px;margin-top:10px;min-height:16px;}
 
 /* ---------- Avisos ---------- */
 #composeBox select, #composeBox input{width:100%;font-family:var(--mono);font-size:14px;background:var(--panel2);
@@ -178,6 +178,12 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 #avJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
 #avJugadorSugerencias .sug:last-child{border-bottom:none;}
 #avJugadorSugerencias .sug:hover{background:var(--accent-dim);}
+#lesJugadorWrap{position:relative;}
+#lesJugadorSugerencias{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--panel2);
+  border:1px solid var(--border2);border-top:none;border-radius:0 0 9px 9px;max-height:190px;overflow-y:auto;}
+#lesJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
+#lesJugadorSugerencias .sug:last-child{border-bottom:none;}
+#lesJugadorSugerencias .sug:hover{background:var(--accent-dim);}
 
 /* ---------- Imprimir / PDF: solo la vista activa, sin nav ni chrome ---------- */
 @media print{
@@ -475,10 +481,76 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 
     <div id="profesBox" class="hidden"></div>
     <div id="staffBox" class="hidden"></div>
+    <div id="medicoBox" class="hidden"></div>
 
     <div id="cumpleBox"></div>
     <div class="exgroup-title">Avisos</div>
     <div id="avisosList"></div>
+  </section>
+
+  <!-- -------- Lesiones (cuerpo médico / PFs) -------- -->
+  <section class="screen" id="screenLesiones">
+    <div class="exgroup-title">🩹 Cargar lesión</div>
+    <div class="fitem" id="lesJugadorWrap">
+      <label>Jugador</label>
+      <input type="text" id="lesJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
+      <div id="lesJugadorSugerencias" class="hidden"></div>
+    </div>
+    <div class="fitem">
+      <label>Fecha</label>
+      <input type="date" id="lesFecha">
+    </div>
+    <div class="fitem">
+      <label>Contexto</label>
+      <select id="lesContexto">
+        <option value="PARTIDO">Partido</option>
+        <option value="ENTRENAMIENTO">Entrenamiento</option>
+      </select>
+    </div>
+    <div class="fitem" id="lesMinutoWrap">
+      <label>Minuto</label>
+      <select id="lesMinuto">
+        <option value="0-20">0-20</option><option value="20-40">20-40</option>
+        <option value="40-60">40-60</option><option value="60-80">60-80</option>
+      </select>
+    </div>
+    <div class="fitem">
+      <label>Zona</label>
+      <select id="lesZona"><option value="">Elegí la zona</option></select>
+    </div>
+    <div class="fitem">
+      <label>Lado</label>
+      <select id="lesLado"><option value="">Elegí el lado</option></select>
+    </div>
+    <div class="fitem">
+      <label>Tipo de lesión</label>
+      <select id="lesTipo"><option value="">Elegí el tipo</option></select>
+    </div>
+    <div class="fitem">
+      <label>Diagnóstico</label>
+      <select id="lesDiagnostico"><option value="">Elegí el diagnóstico</option></select>
+    </div>
+    <div class="fitem">
+      <label>¿Es recurrencia?</label>
+      <select id="lesRecurrencia"><option value="">Elegí</option></select>
+    </div>
+    <div class="fitem">
+      <label>Causa</label>
+      <select id="lesCausa"><option value="">Elegí la causa</option></select>
+    </div>
+    <div class="fitem">
+      <label>Mecanismo</label>
+      <select id="lesMecanismo"><option value="">Elegí el mecanismo</option></select>
+    </div>
+    <div class="fitem">
+      <label>Detalle (opcional)</label>
+      <input type="text" id="lesDetalle" maxlength="300" placeholder="Observaciones adicionales">
+    </div>
+    <button id="lesEnviarBtn">Cargar lesión</button>
+    <div id="lesMsg"></div>
+
+    <div class="exgroup-title" style="margin-top:22px;">Últimas cargadas</div>
+    <div id="lesList"></div>
   </section>
 
   <nav class="tabs">
@@ -487,6 +559,7 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
     <button class="tab" data-screen="Carga"><span class="ic">➕</span>Cargar</button>
     <button class="tab" data-screen="Avisos"><span class="ic">🔔</span>Avisos<span id="avBadge" class="hidden"></span></button>
     <button class="tab" data-screen="Revisar" id="tabRevisar" style="display:none;"><span class="ic">🗂</span>Revisar</button>
+    <button class="tab" data-screen="Lesiones" id="tabLesiones" style="display:none;"><span class="ic">🩹</span>Lesiones</button>
   </nav>
 </div>
 
