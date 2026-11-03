@@ -131,9 +131,21 @@ function sesionVencida_() {
   iniciarGoogle();
 }
 
+// Tabs que solo le corresponden a coach/staff/médico (nunca a un jugador normal) -- se vuelven
+// a mostrar recién si el backend confirma ese rol (ver entrarComoCoach_/Staff_/Medico_).
+var TABS_OPCIONALES = ['Revisar', 'Lesiones'];
+
 function entrarAlApp_() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
+  // Arranca siempre desde cero: salir_() deja TODOS los tabs visibles al cerrar sesión (para no
+  // tener que saber de antemano qué rol va a loguearse después), así que si no se ocultan los
+  // opcionales acá, un jugador normal que vuelve a entrar después de un logout (o de una sesión
+  // vencida) hereda Revisar/Lesiones de la sesión anterior aunque no le correspondan -- bug real
+  // reportado por Mariano, 3/11 ("le apareció Revisar a un jugador").
+  document.querySelectorAll('.tab').forEach(function (t) {
+    if (TABS_OPCIONALES.indexOf(t.getAttribute('data-screen')) >= 0) t.style.display = 'none';
+  });
   // Mis Datos y Avisos no dependen uno del otro -- se pedían encadenados (uno esperaba al otro)
   // y eso duplicaba el tiempo de apertura. Van en paralelo (pedido de Mariano, 2/11: "que cargue
   // más rápido").
