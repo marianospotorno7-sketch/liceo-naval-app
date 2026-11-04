@@ -172,18 +172,15 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
 .avisocard.unread .meta{color:var(--accent);}
 .avisocard .meta{font-family:var(--mono);font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
 .avisocard .texto{font-size:13.5px;}
-#avJugadorWrap{position:relative;}
-#avJugadorSugerencias{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--panel2);
+/* Buscador de nombre de jugador (Avisos, Lesiones, Ver como jugador, Enviar por mail): mismo
+   patrón en los 4 -- input + caja de sugerencias absoluta debajo, por eso una sola clase
+   compartida en vez de repetir el bloque por cada id (más fácil de mantener/replicar). */
+.searchwrap{position:relative;}
+.sugbox{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--panel2);
   border:1px solid var(--border2);border-top:none;border-radius:0 0 9px 9px;max-height:190px;overflow-y:auto;}
-#avJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
-#avJugadorSugerencias .sug:last-child{border-bottom:none;}
-#avJugadorSugerencias .sug:hover{background:var(--accent-dim);}
-#lesJugadorWrap{position:relative;}
-#lesJugadorSugerencias{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--panel2);
-  border:1px solid var(--border2);border-top:none;border-radius:0 0 9px 9px;max-height:190px;overflow-y:auto;}
-#lesJugadorSugerencias .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
-#lesJugadorSugerencias .sug:last-child{border-bottom:none;}
-#lesJugadorSugerencias .sug:hover{background:var(--accent-dim);}
+.sugbox .sug{padding:9px 12px;font-family:var(--mono);font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
+.sugbox .sug:last-child{border-bottom:none;}
+.sugbox .sug:hover{background:var(--accent-dim);}
 
 /* ---------- Imprimir / PDF: solo la vista activa, sin nav ni chrome ---------- */
 @media print{
@@ -281,9 +278,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
             <option value="JUGADOR">Un jugador</option>
           </select>
         </div>
-        <div class="fitem hidden" id="mailJugadorWrap">
+        <div class="fitem hidden searchwrap" id="mailJugadorWrap">
           <label>Nombre del jugador</label>
           <input type="text" id="mailJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
+          <div id="mailJugadorSugerencias" class="sugbox hidden"></div>
         </div>
         <button id="mailEnviarBtn" class="btn-outline" style="margin-bottom:0;">Enviar</button>
         <div id="mailMsg" style="text-align:center;font-family:var(--mono);font-size:12px;margin-top:8px;"></div>
@@ -466,10 +464,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
           <option value="M19">M19</option><option value="PLANTEL">PLANTEL</option><option value="G2 PS">G2 PS</option>
         </select>
       </div>
-      <div class="fitem hidden" id="avJugadorWrap">
+      <div class="fitem hidden searchwrap" id="avJugadorWrap">
         <label>Nombre del jugador (como está en la planilla)</label>
         <input type="text" id="avJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
-        <div id="avJugadorSugerencias" class="hidden"></div>
+        <div id="avJugadorSugerencias" class="sugbox hidden"></div>
       </div>
       <div class="fitem">
         <label>Mensaje</label>
@@ -491,10 +489,10 @@ legend{font-family:var(--mono);font-size:10.5px;color:var(--gold-bright);font-we
   <!-- -------- Lesiones (cuerpo médico / PFs) -------- -->
   <section class="screen" id="screenLesiones">
     <div class="exgroup-title">🩹 Cargar lesión</div>
-    <div class="fitem" id="lesJugadorWrap">
+    <div class="fitem searchwrap" id="lesJugadorWrap">
       <label>Jugador</label>
       <input type="text" id="lesJugador" placeholder="Ej. Pérez Juan" autocomplete="off">
-      <div id="lesJugadorSugerencias" class="hidden"></div>
+      <div id="lesJugadorSugerencias" class="sugbox hidden"></div>
     </div>
     <div class="fitem">
       <label>Fecha</label>

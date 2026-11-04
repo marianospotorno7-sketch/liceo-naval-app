@@ -84,7 +84,12 @@ var MECANISMOS_LESION = ['Tackleador', 'Tackleado', 'Scrum', 'Maul', 'Ruck', 'Li
 var state = {token: null, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
   jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null,
   esStaff: false, staffCamadas: null, revisar: null, revisarCamada: 'TODAS', previewJugador: null, cargaTab: 'gym',
-  esMedico: false, lesionesJugadores: [], lesionesList: null};
+  // jugadoresBusqueda: lista para los 3 buscadores de nombre (Lesiones, Ver como jugador -- Avisos
+  // sigue usando jugadoresLista, que ya le llega gratis con la respuesta de 'avisos'). Se precarga
+  // al entrar como coach/médico (ver cargarAvisos_/entrarComoMedico_) para que esté lista ANTES de
+  // que alguien escriba, no recién cuando abre esa pantalla -- antes se pedía recién al entrar a
+  // Lesiones, y si el jugador escribía rápido el buscador quedaba vacío (bug real, 4/11).
+  esMedico: false, jugadoresBusqueda: [], lesionesList: null};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -229,6 +234,7 @@ function entrarComoMedico_() {
     var pantalla = t.getAttribute('data-screen');
     t.style.display = (pantalla == 'Ranking' || pantalla == 'Lesiones') ? '' : 'none';
   });
+  cargarJugadoresBusqueda_();
   irAPantalla_('Lesiones');
 }
 
@@ -251,13 +257,30 @@ function cargarRankingCoach_() {
 }
 
 function cargarAvisos_() {
-  backendGet_('avisos').then(function (d) { state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || []; renderAvisos_(); actualizarBadge_(); })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('avisos', err); });
+  backendGet_('avisos').then(function (d) {
+    state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || [];
+    if (d.jugadores) { state.jugadoresBusqueda = d.jugadores; refrescarSugerenciasActivas_(); }   // coach: gratis, misma lista que ya pide avisos
+    renderAvisos_(); actualizarBadge_();
+  }).catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('avisos', err); });
 }
 
-function cargarLesionesJugadores_() {
-  backendGet_('jugadoresLesion').then(function (d) { state.lesionesJugadores = d.jugadores || []; })
-    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('jugadoresLesion', err); });
+// Médico no pasa por cargarAvisos_ (esa pantalla no la ve), así que precarga la lista acá --
+// coach ya la tiene por cargarAvisos_ arriba, no hace falta pedirla de nuevo.
+function cargarJugadoresBusqueda_() {
+  backendGet_('jugadoresBusqueda').then(function (d) { state.jugadoresBusqueda = d.jugadores || []; refrescarSugerenciasActivas_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('jugadoresBusqueda', err); });
+}
+
+// Si la lista de jugadores llega DESPUÉS de que alguien ya empezó a escribir en un buscador
+// (Lesiones o Ver como jugador), lo vuelve a filtrar con lo que ya tiene tipeado -- sin esto, si
+// el pedido tardaba, el buscador se quedaba vacío para siempre aunque la lista ya hubiera llegado
+// (bug real reportado por Mariano, 4/11: "no me despliega la lista").
+function refrescarSugerenciasActivas_() {
+  [['lesJugador', renderSugerenciasJugadorLesion_], ['previewInput', renderSugerenciasPreview_], ['mailJugador', renderSugerenciasMail_]]
+    .forEach(function (par) {
+      var inp = document.getElementById(par[0]);
+      if (inp && document.activeElement === inp && inp.value) par[1](inp.value);
+    });
 }
 
 function cargarLesionesList_() {
@@ -512,8 +535,15 @@ function abrirVerComoJugador_() {
   if (!box.classList.contains('hidden') && box.getAttribute('data-modo') == 'buscar') { box.classList.add('hidden'); box.innerHTML = ''; return; }
   box.setAttribute('data-modo', 'buscar');
   box.classList.remove('hidden');
-  box.innerHTML = '<div class="fitem"><label>Nombre del jugador (de tu camada)</label><input type="text" id="previewInput" placeholder="Ej. Pérez Juan" autocomplete="off"></div>' +
+  box.innerHTML = '<div class="fitem searchwrap" id="previewJugadorWrap"><label>Nombre del jugador (de tu camada)</label>' +
+    '<input type="text" id="previewInput" placeholder="Ej. Pérez Juan" autocomplete="off">' +
+    '<div id="previewJugadorSugerencias" class="sugbox hidden"></div></div>' +
     '<button id="previewBuscarBtn" class="btn-outline" style="margin-bottom:14px;">Ver</button>';
+  if (!state.jugadoresBusqueda.length) cargarJugadoresBusqueda_();
+  document.getElementById('previewInput').oninput = function (e) { renderSugerenciasPreview_(e.target.value); };
+  document.getElementById('previewInput').addEventListener('blur', function () {
+    setTimeout(function () { var s = document.getElementById('previewJugadorSugerencias'); if (s) s.classList.add('hidden'); }, 150);
+  });
   document.getElementById('previewBuscarBtn').onclick = function () {
     var nombre = document.getElementById('previewInput').value.trim();
     if (!nombre) return;
@@ -791,14 +821,15 @@ function normalizarBusqueda_(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-// Sugerencias del buscador de jugador al escribir un aviso a "Un jugador": filtra
-// state.jugadoresLista (la manda el backend solo al coach) por coincidencia en cualquier
-// parte del nombre, sin importar mayúsculas/tildes.
-function renderSugerenciasJugador_(q) {
-  var cont = document.getElementById('avJugadorSugerencias');
+// Buscador de nombre de jugador: mismo patrón en las 4 pantallas que lo usan (Avisos, Lesiones,
+// Ver como jugador, Enviar por mail) -- una sola función en vez de repetirla 4 veces, para que un
+// arreglo futuro (como el de Lesiones, 4/11) no se tenga que acordar de pisar cada copia.
+function renderSugerenciasNombre_(contId, inputId, lista, q) {
+  var cont = document.getElementById(contId);
+  if (!cont) return;
   var query = normalizarBusqueda_(q).trim();
   if (!query) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
-  var coincidencias = (state.jugadoresLista || [])
+  var coincidencias = (lista || [])
     .filter(function (n) { return normalizarBusqueda_(n).indexOf(query) >= 0; })
     .slice(0, 8);
   cont.innerHTML = '';
@@ -806,13 +837,21 @@ function renderSugerenciasJugador_(q) {
   coincidencias.forEach(function (n) {
     var div = document.createElement('div'); div.className = 'sug'; div.textContent = n;
     div.onclick = function () {
-      document.getElementById('avJugador').value = n;
+      document.getElementById(inputId).value = n;
       cont.classList.add('hidden'); cont.innerHTML = '';
     };
     cont.appendChild(div);
   });
   cont.classList.remove('hidden');
 }
+// state.jugadoresLista (la manda el backend solo al coach, scopeada a su camada) vs.
+// state.jugadoresBusqueda (precargada para coach y cuerpo médico -- ver cargarAvisos_/
+// cargarJugadoresBusqueda_): misma lista de nombres para un coach, pero jugadoresLista no existe
+// para el cuerpo médico, así que cada buscador usa la que le corresponde.
+function renderSugerenciasJugador_(q) { renderSugerenciasNombre_('avJugadorSugerencias', 'avJugador', state.jugadoresLista, q); }
+function renderSugerenciasJugadorLesion_(q) { renderSugerenciasNombre_('lesJugadorSugerencias', 'lesJugador', state.jugadoresBusqueda, q); }
+function renderSugerenciasPreview_(q) { renderSugerenciasNombre_('previewJugadorSugerencias', 'previewInput', state.jugadoresBusqueda, q); }
+function renderSugerenciasMail_(q) { renderSugerenciasNombre_('mailJugadorSugerencias', 'mailJugador', state.jugadoresBusqueda, q); }
 
 function enviarAviso_() {
   var msg = document.getElementById('avMsg');
@@ -991,28 +1030,8 @@ function enviarPartido_() {
 // ---------------------------------------------------------------------------
 function pintarCamposLesion_() {
   document.getElementById('lesFecha').value = new Date().toISOString().slice(0, 10);
-  cargarLesionesJugadores_();
+  if (!state.jugadoresBusqueda.length) cargarJugadoresBusqueda_();
   cargarLesionesList_();
-}
-
-// Mismo patrón que renderSugerenciasJugador_ (Avisos), sobre state.lesionesJugadores y el
-// buscador de la pantalla Lesiones -- no se reusa la misma lista: Avisos solo la manda al coach,
-// y el cuerpo médico (sin cargo) la pide por su cuenta con la acción 'jugadoresLesion'.
-function renderSugerenciasJugadorLesion_(q) {
-  var cont = document.getElementById('lesJugadorSugerencias');
-  var query = normalizarBusqueda_(q).trim();
-  if (!query) { cont.classList.add('hidden'); cont.innerHTML = ''; return; }
-  var coincidencias = (state.lesionesJugadores || [])
-    .filter(function (n) { return normalizarBusqueda_(n).indexOf(query) >= 0; })
-    .slice(0, 8);
-  cont.innerHTML = '';
-  if (!coincidencias.length) { cont.classList.add('hidden'); return; }
-  coincidencias.forEach(function (n) {
-    var div = document.createElement('div'); div.className = 'sug'; div.textContent = n;
-    div.onclick = function () { document.getElementById('lesJugador').value = n; cont.classList.add('hidden'); cont.innerHTML = ''; };
-    cont.appendChild(div);
-  });
-  cont.classList.remove('hidden');
 }
 
 function renderLesionesList_() {
@@ -1121,10 +1140,18 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('#cargaPills .pill').forEach(function (b) { b.onclick = function () { cambiarCargaTab_(b.getAttribute('data-carga')); }; });
   document.getElementById('revisarCamada').onchange = function (e) { state.revisarCamada = e.target.value; cargarRevisar_(); };
   document.getElementById('verComoJugadorBtn').onclick = abrirVerComoJugador_;
-  document.getElementById('mailBtn').onclick = function () { document.getElementById('mailBox').classList.toggle('hidden'); };
+  document.getElementById('mailBtn').onclick = function () {
+    document.getElementById('mailBox').classList.toggle('hidden');
+    if (!state.jugadoresBusqueda.length) cargarJugadoresBusqueda_();
+  };
   document.getElementById('mailDestino').onchange = function (e) {
     document.getElementById('mailJugadorWrap').classList.toggle('hidden', e.target.value != 'JUGADOR');
+    document.getElementById('mailJugadorSugerencias').classList.add('hidden');
   };
+  document.getElementById('mailJugador').oninput = function (e) { renderSugerenciasMail_(e.target.value); };
+  document.getElementById('mailJugador').addEventListener('blur', function () {
+    setTimeout(function () { document.getElementById('mailJugadorSugerencias').classList.add('hidden'); }, 150);
+  });
   document.getElementById('mailEnviarBtn').onclick = enviarInformePorMail_;
   document.getElementById('imprimirBtn').onclick = function () { window.print(); };
   document.getElementById('excelBtn').onclick = descargarExcel_;
