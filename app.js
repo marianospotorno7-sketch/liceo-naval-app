@@ -89,7 +89,8 @@ var state = {token: null, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', 
   // al entrar como coach/médico (ver cargarAvisos_/entrarComoMedico_) para que esté lista ANTES de
   // que alguien escriba, no recién cuando abre esa pantalla -- antes se pedía recién al entrar a
   // Lesiones, y si el jugador escribía rápido el buscador quedaba vacío (bug real, 4/11).
-  esMedico: false, jugadoresBusqueda: [], lesionesList: null};
+  esMedico: false, jugadoresBusqueda: [], lesionesList: null,
+  coachRankGrupo: 'fuerza', coachRankEj: 'ARRANQUE', coachRanking: null};
 
 function configLista_() {
   return CONFIG.CLIENT_ID.indexOf('PENDIENTE') < 0 && CONFIG.BACKEND_URL.indexOf('PENDIENTE') < 0;
@@ -256,6 +257,13 @@ function cargarRankingCoach_() {
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('rankingCoach', err); });
 }
 
+// Ranking por ejercicio para el cuerpo técnico, pedido de Mariano (4/11): "como lo tienen los
+// jugadores" pero para la camada elegida en el mismo selector que ya usa Partidos y lesiones.
+function cargarRankingCamada_() {
+  backendGet_('rankingCamada', {camada: state.coachCamada}).then(function (d) { state.coachRanking = d.ranking; renderCoachRanking_(); })
+    .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; console.error('rankingCamada', err); });
+}
+
 function cargarAvisos_() {
   backendGet_('avisos').then(function (d) {
     state.avisos = d; state.jugadoresLista = d.jugadores || []; state.solicitudes = d.solicitudes || [];
@@ -351,27 +359,63 @@ var RANKING_GRUPOS = {
 };
 var RANKING_GRUPO_NOMBRE = {fuerza: 'Ranking fuerza', campo: 'Ranking campo', partidos: 'Ranking partidos'};
 
-function renderRankGrupos_() {
-  var cont = document.getElementById('rankGrupos'); cont.innerHTML = '';
+// Pills (grupo fuerza/campo/partidos) y chips (ejercicio dentro del grupo): mismo patrón para el
+// ranking del jugador y el del cuerpo técnico (ver renderCoachRankGrupos_/Chips_ más abajo), solo
+// cambia en qué contenedor pintan y qué hacen al tocar un botón.
+function renderRankGruposEn_(contId, grupoActual, onClickGrupo) {
+  var cont = document.getElementById(contId); cont.innerHTML = '';
   Object.keys(RANKING_GRUPOS).forEach(function (g) {
-    var b = document.createElement('button'); b.className = 'pill' + (g == state.rankingGrupo ? ' active' : '');
+    var b = document.createElement('button'); b.className = 'pill' + (g == grupoActual ? ' active' : '');
     b.textContent = RANKING_GRUPO_NOMBRE[g];
-    b.onclick = function () {
-      state.rankingGrupo = g;
-      if (RANKING_GRUPOS[g].indexOf(state.rankingEj) < 0) state.rankingEj = RANKING_GRUPOS[g][0];
-      renderRanking_();
-    };
+    b.onclick = function () { onClickGrupo(g); };
     cont.appendChild(b);
   });
 }
 
-function renderRankChips_() {
-  var cont = document.getElementById('rankChips'); cont.innerHTML = '';
-  RANKING_GRUPOS[state.rankingGrupo].forEach(function (e) {
-    var b = document.createElement('button'); b.className = 'chip' + (e == state.rankingEj ? ' active' : '');
-    b.textContent = etiqueta_(e); b.onclick = function () { state.rankingEj = e; renderRanking_(); };
+function renderRankChipsEn_(contId, grupoActual, ejActual, onClickEj) {
+  var cont = document.getElementById(contId); cont.innerHTML = '';
+  RANKING_GRUPOS[grupoActual].forEach(function (e) {
+    var b = document.createElement('button'); b.className = 'chip' + (e == ejActual ? ' active' : '');
+    b.textContent = etiqueta_(e); b.onclick = function () { onClickEj(e); };
     cont.appendChild(b);
   });
+}
+
+function renderRankGrupos_() {
+  renderRankGruposEn_('rankGrupos', state.rankingGrupo, function (g) {
+    state.rankingGrupo = g;
+    if (RANKING_GRUPOS[g].indexOf(state.rankingEj) < 0) state.rankingEj = RANKING_GRUPOS[g][0];
+    renderRanking_();
+  });
+}
+
+function renderRankChips_() {
+  renderRankChipsEn_('rankChips', state.rankingGrupo, state.rankingEj, function (e) { state.rankingEj = e; renderRanking_(); });
+}
+
+function renderCoachRankGrupos_() {
+  renderRankGruposEn_('coachRankGrupos', state.coachRankGrupo, function (g) {
+    state.coachRankGrupo = g;
+    if (RANKING_GRUPOS[g].indexOf(state.coachRankEj) < 0) state.coachRankEj = RANKING_GRUPOS[g][0];
+    renderCoachRanking_();
+  });
+}
+
+function renderCoachRankChips_() {
+  renderRankChipsEn_('coachRankChips', state.coachRankGrupo, state.coachRankEj, function (e) { state.coachRankEj = e; renderCoachRanking_(); });
+}
+
+// Top 10 de la camada elegida (o club entero) para el ejercicio elegido -- sin "tu puesto" (acá
+// no hay un jugador propio, es la vista del cuerpo técnico).
+function renderCoachRanking_() {
+  renderCoachRankGrupos_();
+  renderCoachRankChips_();
+  document.getElementById('coachRankTitulo').textContent = 'Top 10 — ' + (state.coachCamada == 'TODAS' ? 'todo el club' : state.coachCamada);
+  var tabla = document.getElementById('coachRankTabla'); tabla.innerHTML = '';
+  if (!state.coachRanking) return;
+  var lista = state.coachRanking[state.coachRankEj];
+  if (!lista) return;
+  tabla.appendChild(tablaRanking_(lista, null, null, state.coachRankEj));
 }
 
 function tablaRanking_(lista, mePuesto, soyNombre, ej) {
@@ -1103,7 +1147,7 @@ function irAPantalla_(nombre) {
     document.getElementById('coachExportBox').classList.toggle('hidden', !esStaffOCoach);
     document.getElementById('excelBtn').classList.toggle('hidden', !state.esCoach);   // staff: solo imprimir, no excel ni mail
     document.getElementById('mailBtn').classList.toggle('hidden', !state.esCoach);
-    if (esStaffOCoach) cargarRankingCoach_();
+    if (esStaffOCoach) { cargarRankingCoach_(); cargarRankingCamada_(); }
     if (state.misDatos && !state.ranking) cargarRanking_();
   }
   if (nombre == 'Carga') pintarCamposCarga_();
@@ -1130,7 +1174,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('avJugador').addEventListener('blur', function () {
     setTimeout(function () { document.getElementById('avJugadorSugerencias').classList.add('hidden'); }, 150);
   });
-  document.getElementById('coachCamada').onchange = function (e) { state.coachCamada = e.target.value; cargarRankingCoach_(); };
+  document.getElementById('coachCamada').onchange = function (e) { state.coachCamada = e.target.value; cargarRankingCoach_(); cargarRankingCamada_(); };
   document.getElementById('partidoBtn').onclick = enviarPartido_;
   document.getElementById('pLesion').onchange = function (e) {
     var hayLesion = e.target.value != 'NO';
