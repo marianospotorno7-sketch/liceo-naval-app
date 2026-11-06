@@ -80,6 +80,9 @@ var CAUSAS_LESION = ['Sin contacto', 'Contacto indirecto con otro jugador', 'Con
   'Contacto directo con otro jugador', 'Contacto directo con un objeto (pelota / suelo / poste)'];
 var MECANISMOS_LESION = ['Tackleador', 'Tackleado', 'Scrum', 'Maul', 'Ruck', 'Line out', 'Colisión / choque', 'Carrera / sprint',
   'Cambio de dirección', 'Salto', 'Caída', 'Patada', 'Try (anotando)', 'Pisotón', 'Sobreuso / sobrecarga (sin mecanismo puntual)', 'Otro'];
+// Campo nuevo (4/11/2026, para la app de Partido en Vivo): tiene que ser EXACTAMENTE la misma
+// lista que VUELTA_JUEGO_LESION en el backend.
+var VUELTA_JUEGO_LESION = ['Mismo partido', '1 semana', '2 a 4 semanas', '1 a 3 meses', 'A definir'];
 
 var state = {token: null, misDatos: null, ranking: null, rankingEj: 'ARRANQUE', rankingGrupo: 'fuerza', avisos: null, esCoach: false,
   jugadoresLista: [], solicitudes: [], coachCamada: 'TODAS', coachPartidos: null,
@@ -622,6 +625,11 @@ function cargarRevisar_() {
     .catch(function (err) { if (ERRORES_CON_PANTALLA_PROPIA.indexOf(err) >= 0) return; });
 }
 
+// Cargas PENDIENTE (kg sospechosamente alto, ver kgSospechoso_ en el backend -- caso real que lo
+// motivó, 6/11: un peso muerto de 650kg migrado de la base vieja que se coló en el ranking y no
+// había forma de sacar porque Revisar nunca toca HISTÓRICO) van primero, con Aprobar/Rechazar
+// además del Borrar de siempre -- a diferencia de Borrar, Rechazar no borra la fila: la deja
+// marcada para que nunca vuelva a sumar a ranking/récords pero quede como rastro.
 function renderRevisar_() {
   var d = state.revisar;
   var sel = document.getElementById('revisarCamada');
@@ -632,25 +640,65 @@ function renderRevisar_() {
   }
   var list = document.getElementById('revisarList'); list.innerHTML = '';
   if (!d || !d.registros || !d.registros.length) { list.innerHTML = '<div class="exempty">Sin cargas para revisar.</div>'; return; }
-  d.registros.forEach(function (r) {
-    var div = document.createElement('div'); div.className = 'avisocard';
-    var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = fmtFecha_(r.fecha) + ' · ' + r.nombre + ' · ' + r.camada;
-    var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = r.titulo + ': ' + r.texto;
-    var btn = document.createElement('button'); btn.textContent = 'Borrar';
-    btn.style.cssText = 'margin-top:8px;background:none;border:1px solid var(--red);color:var(--red);font-weight:700;font-family:var(--sans);font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;';
-    btn.onclick = function () {
-      if (btn.textContent == 'Borrar') { btn.textContent = '¿Seguro?'; return; }
-      btn.disabled = true; btn.textContent = 'Borrando…';
-      borrarCarga_(r.hoja, r.id);
-    };
-    div.appendChild(meta); div.appendChild(texto); div.appendChild(btn);
-    list.appendChild(div);
-  });
+  var pendientes = d.registros.filter(function (r) { return r.estado == 'PENDIENTE'; });
+  var resto = d.registros.filter(function (r) { return r.estado != 'PENDIENTE'; });
+  if (pendientes.length) {
+    var tituloP = document.createElement('div'); tituloP.className = 'exgroup-title';
+    tituloP.textContent = '⚠️ Valores a revisar (' + pendientes.length + ')';
+    list.appendChild(tituloP);
+    pendientes.forEach(function (r) { list.appendChild(tarjetaRevisar_(r)); });
+    var tituloR = document.createElement('div'); tituloR.className = 'exgroup-title'; tituloR.style.marginTop = '18px';
+    tituloR.textContent = 'Últimas cargas';
+    list.appendChild(tituloR);
+  }
+  resto.forEach(function (r) { list.appendChild(tarjetaRevisar_(r)); });
+}
+
+function tarjetaRevisar_(r) {
+  var div = document.createElement('div'); div.className = 'avisocard' + (r.estado == 'PENDIENTE' ? ' unread' : '');
+  var metaTxt = fmtFecha_(r.fecha) + ' · ' + r.nombre + ' · ' + r.camada;
+  if (r.estado == 'PENDIENTE') metaTxt += ' · ⚠️ pendiente de aprobación';
+  else if (r.estado == 'RECHAZADO') metaTxt += ' · ❌ rechazado';
+  var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = metaTxt;
+  var texto = document.createElement('div'); texto.className = 'texto'; texto.textContent = r.titulo + ': ' + r.texto;
+  div.appendChild(meta); div.appendChild(texto);
+  if (r.obs) {
+    var obsDiv = document.createElement('div'); obsDiv.className = 'lastmark'; obsDiv.style.cssText = 'margin-top:4px;color:var(--gold-bright);';
+    obsDiv.textContent = r.obs; div.appendChild(obsDiv);
+  }
+  var botones = document.createElement('div'); botones.style.cssText = 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;';
+  if (r.estado == 'PENDIENTE') {
+    var ok = document.createElement('button'); ok.textContent = 'Aprobar';
+    ok.style.cssText = 'flex:1;min-width:90px;background:var(--green);border:none;color:#06222e;font-weight:800;font-family:var(--sans);font-size:12px;padding:8px;border-radius:9px;cursor:pointer;';
+    ok.onclick = function () { ok.disabled = true; ok.textContent = 'Aprobando…'; resolverCarga_(r.id, true); };
+    var no = document.createElement('button'); no.textContent = 'Rechazar';
+    no.style.cssText = 'flex:1;min-width:90px;background:var(--panel2);border:1px solid var(--border2);color:var(--text-mid);font-weight:700;font-family:var(--sans);font-size:12px;padding:8px;border-radius:9px;cursor:pointer;';
+    no.onclick = function () { no.disabled = true; no.textContent = 'Rechazando…'; resolverCarga_(r.id, false); };
+    botones.appendChild(ok); botones.appendChild(no);
+  }
+  var btn = document.createElement('button'); btn.textContent = 'Borrar';
+  btn.style.cssText = 'flex:1;min-width:90px;background:none;border:1px solid var(--red);color:var(--red);font-weight:700;font-family:var(--sans);font-size:11px;padding:8px 12px;border-radius:9px;cursor:pointer;';
+  btn.onclick = function () {
+    if (btn.textContent == 'Borrar') { btn.textContent = '¿Seguro?'; return; }
+    btn.disabled = true; btn.textContent = 'Borrando…';
+    borrarCarga_(r.hoja, r.id);
+  };
+  botones.appendChild(btn);
+  div.appendChild(botones);
+  return div;
 }
 
 function borrarCarga_(hoja, id) {
   fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
     body: JSON.stringify({token: state.token, action: 'borrarCarga', hoja: hoja, id: id})})
+    .then(function (r) { return r.json(); })
+    .then(function () { cargarRevisar_(); })
+    .catch(function () { cargarRevisar_(); });
+}
+
+function resolverCarga_(id, aprobar) {
+  fetch(CONFIG.BACKEND_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({token: state.token, action: 'resolverCarga', id: id, aprobar: aprobar})})
     .then(function (r) { return r.json(); })
     .then(function () { cargarRevisar_(); })
     .catch(function () { cargarRevisar_(); });
@@ -803,6 +851,12 @@ function renderMedico_() {
   var m = state.avisos && state.avisos.medico;
   renderGrupoEmails_('medicoBox', '⚙️ Cuerpo médico (todo el club)', m ? [{camada: 'Todo el club', emails: m}] : null, 'guardarMedico');
 }
+// Rol PARTIDO: independiente de médico (4/11/2026, pedido de Mariano) -- da acceso a la app de
+// Partido en Vivo (cargar el partido y Lesiones ahí), no a esta app. Mismo patrón de UI.
+function renderPartidoRol_() {
+  var p = state.avisos && state.avisos.partidoRol;
+  renderGrupoEmails_('partidoBox', '⚙️ Partido en Vivo (todo el club)', p ? [{camada: 'Todo el club', emails: p}] : null, 'guardarPartidoRol');
+}
 
 function renderAvisos_() {
   var d = state.avisos; if (!d) return;
@@ -815,6 +869,7 @@ function renderAvisos_() {
   renderProfes_();
   renderStaff_();
   renderMedico_();
+  renderPartidoRol_();
   if (d.esCoach) ajustarComposeBoxCargo_(d.camadasCargo);
 
   var cb = document.getElementById('cumpleBox'); cb.innerHTML = '';
@@ -1088,6 +1143,7 @@ function renderLesionesList_() {
     div.innerHTML = '<div class="meta">' + fmtFecha_(x.fecha) + ' · ' + x.jugador + ' · ' + x.camada + '</div>' +
       '<div class="texto">' + contexto + ' — ' + x.zona + ' (' + x.lado + ') — ' + x.tipo + (x.diagnostico ? ' / ' + x.diagnostico : '') + '</div>' +
       '<div class="lastmark" style="margin-top:4px;">' + x.causa + ' · ' + x.mecanismo + (x.recurrencia == 'Sí' ? ' · Recurrencia' : '') + '</div>' +
+      (x.vueltaJuego ? '<div class="lastmark">Vuelta al juego: ' + x.vueltaJuego + '</div>' : '') +
       (x.detalle ? '<div class="lastmark">' + x.detalle + '</div>' : '');
     list.appendChild(div);
   });
@@ -1104,10 +1160,11 @@ function enviarLesion_() {
     zona: document.getElementById('lesZona').value, lado: document.getElementById('lesLado').value,
     tipo: document.getElementById('lesTipo').value, diagnostico: document.getElementById('lesDiagnostico').value,
     recurrencia: document.getElementById('lesRecurrencia').value, causa: document.getElementById('lesCausa').value,
-    mecanismo: document.getElementById('lesMecanismo').value, detalle: document.getElementById('lesDetalle').value.trim()
+    mecanismo: document.getElementById('lesMecanismo').value, vueltaJuego: document.getElementById('lesVuelta').value,
+    detalle: document.getElementById('lesDetalle').value.trim()
   };
   if (!jugador) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí el jugador.'; return; }
-  if (!body.zona || !body.lado || !body.tipo || !body.diagnostico || !body.recurrencia || !body.causa || !body.mecanismo) {
+  if (!body.zona || !body.lado || !body.tipo || !body.diagnostico || !body.recurrencia || !body.causa || !body.mecanismo || !body.vueltaJuego) {
     msg.style.color = 'var(--red)'; msg.textContent = 'Completá todos los campos.'; return;
   }
   if (contexto == 'PARTIDO' && !body.minuto) { msg.style.color = 'var(--red)'; msg.textContent = 'Elegí el minuto.'; return; }
@@ -1124,7 +1181,7 @@ function enviarLesion_() {
       if (j.error) { msg.style.color = 'var(--red)'; msg.textContent = 'Error: ' + j.error; return; }
       msg.style.color = 'var(--green)'; msg.textContent = '¡Lesión cargada!';
       document.getElementById('lesJugador').value = ''; document.getElementById('lesDetalle').value = '';
-      ['lesZona', 'lesLado', 'lesTipo', 'lesDiagnostico', 'lesRecurrencia', 'lesCausa', 'lesMecanismo'].forEach(function (id) {
+      ['lesZona', 'lesLado', 'lesTipo', 'lesDiagnostico', 'lesRecurrencia', 'lesCausa', 'lesMecanismo', 'lesVuelta'].forEach(function (id) {
         document.getElementById(id).value = '';
       });
       cargarLesionesList_();
@@ -1211,6 +1268,7 @@ document.addEventListener('DOMContentLoaded', function () {
   llenarSelect_('lesRecurrencia', RECURRENCIA_LESION);
   llenarSelect_('lesCausa', CAUSAS_LESION);
   llenarSelect_('lesMecanismo', MECANISMOS_LESION);
+  llenarSelect_('lesVuelta', VUELTA_JUEGO_LESION);
   document.getElementById('lesEnviarBtn').onclick = enviarLesion_;
   document.getElementById('lesContexto').onchange = function (e) {
     document.getElementById('lesMinutoWrap').classList.toggle('hidden', e.target.value != 'PARTIDO');
